@@ -45,14 +45,15 @@ header{display:flex;justify-content:space-between;align-items:center;gap:10px;
   flex-wrap:wrap;padding-bottom:20px;margin-bottom:8px;border-bottom:1px solid var(--border)}
 .brand{display:flex;align-items:center;gap:14px}
 .brand-logo-wrap{background:#fff;border:1px solid var(--border);border-radius:9px;
-  padding:7px 11px;flex:none;display:flex;align-items:center;box-shadow:var(--shadow)}
-.brand-logo{height:30px;width:auto;display:block}
+  padding:8px 12px;flex:none;display:flex;align-items:center;box-shadow:var(--shadow)}
+.brand-logo{height:38px;width:auto;display:block}
+.brand-text{min-width:0}
 h1{font-size:21px;margin:0;letter-spacing:-.02em;font-weight:750}
 .brand .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
 
 .controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-.asof{text-align:right;font-size:12.5px;color:var(--ink2)}
-.asof .big{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+.asof{margin-top:6px;font-size:12px;color:var(--ink2)}
+.asof .big{font-weight:700;color:var(--ink);letter-spacing:-.01em}
 .asof .mut{color:var(--muted)}
 .toggle-group{display:flex;align-items:center;gap:8px}
 .seg{display:inline-flex;background:var(--field);border:1px solid var(--field-border);

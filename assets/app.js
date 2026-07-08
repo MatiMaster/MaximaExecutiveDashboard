@@ -14,7 +14,7 @@ let THEME = localStorage.getItem('mro.theme') || 'light'; // default: clear
 let MODEL = null;      // computed metrics
 let SOURCE = '';       // uploaded file name
 let ITEM_LIMIT = 25;   // top-N for the product performance table
-let ITEM_LIMIT_BO = 25;// top-N for the backorder-adjusted product table
+let BO_MODE = false;   // false = actual sales · true = backorder-adjusted (what-if-fulfilled)
 
 const $ = id => document.getElementById(id);
 const S = () => I18N.STR[LANG];
@@ -338,6 +338,36 @@ function wireTips(sel) {
 }
 const monLabels = () => I18N.MONTHS[LANG];
 
+// ---- FLIP re-rank animation for the performance tables ----
+const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// snapshot each keyed row's viewport position before a re-render
+function captureRowRects() {
+  const map = new Map();
+  document.querySelectorAll('.ptable tbody tr[data-key]').forEach(tr => map.set(tr.dataset.key, tr.getBoundingClientRect().top));
+  return map;
+}
+// after the re-render, tween each row from its old position to its new one.
+// Uses the Web Animations API (fill: none) so no inline styles linger — a row
+// can never get stuck offset or invisible, even under rapid toggling.
+function flipRerank(prev) {
+  if (!prev || reduceMotion() || !document.body.animate) return;
+  const rows = [...document.querySelectorAll('.ptable tbody tr[data-key]')];
+  const ease = 'cubic-bezier(.22,.61,.36,1)';
+  rows.forEach((tr, i) => {
+    const key = tr.dataset.key, delay = Math.min(i * 10, 180);
+    if (prev.has(key)) {
+      const dy = prev.get(key) - tr.getBoundingClientRect().top;   // First - Last
+      if (Math.abs(dy) > 0.5) tr.animate(
+        [{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }],
+        { duration: 550, delay, easing: ease });
+    } else {                                                        // row entering the ranking
+      tr.animate(
+        [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }],
+        { duration: 450, delay, easing: 'ease' });
+    }
+  });
+}
+
 function monthlyBarsSVG(mon) {
   const labels = mon.idx.map(i => monLabels()[i - 1]);
   const cur = mon.cur, prv = mon.prev, n = labels.length;
@@ -411,29 +441,39 @@ function perfTable(isProduct, mode, list, limit) {
 
   const body = rows.map((r, i) => {
     const base = val(r), dsp = base - r.ly, dfy = base - r.fy;
+    const key = (isProduct ? 'p:' + r.item : 's:' + r.seg);
     const c = [{ v: i + 1, cls: 'rank' }];
     if (isProduct) c.push({ html: `<b>${esc(r.item)}</b><span>${esc(r.name)}</span>`, cls: 'name' });
     else c.push({ v: r.seg ? I18N.seg(r.seg, LANG) : 'N/A', cls: 'strong' });
     if (isProduct) c.push({ v: r.seg ? I18N.seg(r.seg, LANG) : 'N/A' });
     c.push({ v: full(r.ytd), cls: 'num' });
-    if (bo) { c.push({ v: r.bo ? full(r.bo) : '—', cls: 'num' }); c.push({ v: full(base), cls: 'num strong' }); }
+    if (bo) { c.push({ v: r.bo ? full(r.bo) : '—', cls: 'num' + (r.bo ? ' bo-add' : '') }); c.push({ v: full(base), cls: 'num strong' }); }
     else c.push({ v: num(r.units), cls: 'num' });
     c.push({ v: full(r.ly), cls: 'num' }, deltaCell(dsp), pctCell(r.ly ? dsp / r.ly : 0, dsp));
     c.push({ v: full(r.fy), cls: 'num' }, deltaCell(dfy), pctCell(r.fy ? dfy / r.fy : 0, dfy));
-    return c;
+    return { key, cells: c };
   });
 
-  return `<div class="ptable-wrap"><table class="ptable"><thead><tr>${H.map(h => `<th class="${h.num ? 'num' : ''}">${esc(h.label)}</th>`).join('')}</tr></thead><tbody>${body.map(cs => `<tr>${cs.map(x => `<td class="${x.cls || ''}">${x.html || esc(x.v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  return `<div class="ptable-wrap"><table class="ptable"><thead><tr>${H.map(h => `<th class="${h.num ? 'num' : ''}">${esc(h.label)}</th>`).join('')}</tr></thead><tbody>${body.map(row => `<tr data-key="${esc(row.key)}">${row.cells.map(x => `<td class="${x.cls || ''}">${x.html || esc(x.v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 
-// top-N segmented control for a product table ('p' = actual, 'b' = backorder)
-function limitTools(kind, cur) {
-  const str = S(), attr = kind === 'p' ? 'data-plimit' : 'data-blimit';
+// top-N segmented control for the product table
+function limitTools(cur) {
+  const str = S();
   return `<div class="table-tools"><span class="lbl">${str.showN}</span><div class="seg">` +
     [10, 25, 50, 'all'].map(v => {
       const target = v === 'all' ? Infinity : v, label = v === 'all' ? str.showAll : v;
-      return `<button class="seg-btn ${cur === target ? 'active' : ''}" ${attr}="${v}">${label}</button>`;
+      return `<button class="seg-btn ${cur === target ? 'active' : ''}" data-plimit="${v}">${label}</button>`;
     }).join('') + `</div></div>`;
+}
+
+// view toggle: actual sales vs. backorder-adjusted (what-if-fulfilled)
+function viewTools() {
+  const str = S();
+  return `<div class="table-tools perf-view"><span class="lbl">${str.perfView}</span><div class="seg">` +
+    `<button class="seg-btn ${!BO_MODE ? 'active' : ''}" data-bomode="0">${str.perfActual}</button>` +
+    `<button class="seg-btn ${BO_MODE ? 'active' : ''}" data-bomode="1">${str.perfBO}</button>` +
+    `</div></div>`;
 }
 
 /* ------------------------------------------------------------------ *
@@ -487,6 +527,10 @@ function render() {
   const segRows = mk.topSegments.map(([k, v]) => [I18N.seg(k, LANG), v]);
   const whTr = rows => rows.map(([k, v]) => [I18N.wh(k, LANG), v]);
   const topSegName = mk.topSegments.length ? I18N.seg(mk.topSegments[0][0], LANG) : '—';
+
+  // product-performance view mode (actual vs. backorder-adjusted)
+  const perfMode = BO_MODE ? 'bo' : 'actual';
+  const perfAbbr = BO_MODE ? str.abbrPerfBO : fmt(str.abbrPerf, { prev: m.prev, year: m.year });
 
   $('dashboard').hidden = false;
   $('dashboard').innerHTML = `
@@ -599,35 +643,20 @@ function render() {
     </div>
   </div>
 
-  <!-- Section 6 — product performance -->
+  <!-- Section 6 — product performance (actual ⇄ backorder-adjusted via toggle) -->
   <div class="section">
     <div class="shead"><div class="snum">6</div><div><h2>${str.s6h}</h2><div class="st">${str.s6st}</div></div></div>
+    ${viewTools()}
     <div class="card">
       <div class="card-title">${str.tblSeg}</div>
-      <div class="abbr">${fmt(str.abbrPerf, { prev: m.prev, year: m.year })}</div>
-      ${perfTable(false, 'actual', pf.segPerf)}
+      <div class="abbr">${perfAbbr}</div>
+      ${perfTable(false, perfMode, pf.segPerf)}
     </div>
     <div class="card mt16">
       <div class="card-title">${str.tblProd}</div>
-      <div class="abbr">${fmt(str.abbrPerf, { prev: m.prev, year: m.year })}</div>
-      ${limitTools('p', ITEM_LIMIT)}
-      ${perfTable(true, 'actual', pf.prodPerf, ITEM_LIMIT)}
-    </div>
-  </div>
-
-  <!-- Section 7 — product performance, backorder-adjusted -->
-  <div class="section">
-    <div class="shead"><div class="snum">7</div><div><h2>${str.s7h}</h2><div class="st">${str.s7st}</div></div></div>
-    <div class="card">
-      <div class="card-title">${str.tblSeg}</div>
-      <div class="abbr">${str.abbrPerfBO}</div>
-      ${perfTable(false, 'bo', pf.segPerf)}
-    </div>
-    <div class="card mt16">
-      <div class="card-title">${str.tblProd}</div>
-      <div class="abbr">${str.abbrPerfBO}</div>
-      ${limitTools('b', ITEM_LIMIT_BO)}
-      ${perfTable(true, 'bo', pf.prodPerf, ITEM_LIMIT_BO)}
+      <div class="abbr">${perfAbbr}</div>
+      ${limitTools(ITEM_LIMIT)}
+      ${perfTable(true, perfMode, pf.prodPerf, ITEM_LIMIT)}
     </div>
   </div>`;
 
@@ -640,9 +669,14 @@ function render() {
     `<span style="flex:${bp};background:var(--bo);color:#fff">${Math.round(bp)}%</span>`;
   wireTips('#chart-trend rect'); wireTips('#chart-cum circle');
 
-  // top-N toggles for the product tables
+  // product-performance controls: view toggle (animated re-rank) + top-N
+  document.querySelectorAll('[data-bomode]').forEach(b => b.onclick = () => {
+    const next = b.dataset.bomode === '1';
+    if (next === BO_MODE) return;
+    const prev = captureRowRects();
+    BO_MODE = next; render(); flipRerank(prev);
+  });
   document.querySelectorAll('[data-plimit]').forEach(b => b.onclick = () => { ITEM_LIMIT = b.dataset.plimit === 'all' ? Infinity : Number(b.dataset.plimit); render(); });
-  document.querySelectorAll('[data-blimit]').forEach(b => b.onclick = () => { ITEM_LIMIT_BO = b.dataset.blimit === 'all' ? Infinity : Number(b.dataset.blimit); render(); });
 
   // footer
   $('foot').hidden = false;

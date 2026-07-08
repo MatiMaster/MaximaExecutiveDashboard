@@ -57,11 +57,13 @@ The build applies the same cleaning rules as the source report, then computes:
 - **Product performance** — per-segment and per-product ranked tables (top-N
   selectable): YTD sales, units, vs. same period last year, vs. full prior year.
   Products are keyed by item SKU (shared between `Sales` and `PendingFullFill`).
-- **Backorder-adjusted performance** — the same ranking with a *what-if-fulfilled*
-  adjustment: `Adjusted = YTD sales + Σ (Unit Price × Back Ordered)` per item,
-  re-ranked by the adjusted total. Items with large backlogs rise; backordered
-  items with no invoiced sales appear as new demand. Per-item backorder amounts
-  sum exactly to the open book's total backorder value.
+  A **view toggle** applies a *what-if-fulfilled* backorder adjustment in place:
+  `Adjusted = YTD sales + Σ (Unit Price × Back Ordered)` per item, re-ranked by
+  the adjusted total. Items with large backlogs rise; backordered items with no
+  invoiced sales appear as new demand. The re-rank is **animated** (FLIP, via the
+  Web Animations API) so the shift is easy to follow; it respects
+  `prefers-reduced-motion`. Per-item backorder amounts sum exactly to the open
+  book's total backorder value.
 
 ## Run locally
 

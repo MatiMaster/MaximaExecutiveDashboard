@@ -70,9 +70,8 @@
       byCust: 'Mayores por cliente',
 
       s6h: 'Rendimiento de productos',
-      s6st: 'Cómo se están vendiendo los productos · ranking por ventas acumuladas del año',
-      s7h: 'Productos con impacto de backorder',
-      s7st: 'Mismo ranking, ajustado por la demanda en backorder — como si se despachara',
+      s6st: 'Cómo se venden los productos · ranking por ventas del año — activa el backorder para ver el impacto',
+      perfView: 'Vista', perfActual: 'Ventas actuales', perfBO: 'Con backorder',
       tblSeg: 'Comparación por segmento',
       tblProd: 'Comparación por producto',
       abbrPerf: '<b>MP</b> = mismo período {prev} · <b>AC</b> = año completo {prev} · <b>Ventas año</b> = acumulado {year}',
@@ -145,9 +144,8 @@
       byCust: 'Top by customer',
 
       s6h: 'Product performance',
-      s6st: 'How products are selling · ranked by year-to-date sales',
-      s7h: 'Products with backorder impact',
-      s7st: 'Same ranking, adjusted for backordered demand — as if it shipped',
+      s6st: 'How products are selling · ranked by YTD sales — toggle backorder to see the impact',
+      perfView: 'View', perfActual: 'Actual sales', perfBO: 'With backorder',
       tblSeg: 'Segment comparison',
       tblProd: 'Product comparison',
       abbrPerf: '<b>SP</b> = same period {prev} · <b>FY</b> = full year {prev} · <b>YTD sales</b> = year to date {year}',

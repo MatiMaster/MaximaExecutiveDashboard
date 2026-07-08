@@ -490,6 +490,8 @@ function render() {
   $('t-title').textContent = str.title;
   $('t-subtitle').textContent = str.subtitle;
   $('btn-reupload').textContent = str.reupload;
+  $('btn-share').textContent = str.share;
+  $('loading').hidden = true;
 
   // language / theme button states
   document.querySelectorAll('#lang-seg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === LANG));
@@ -504,6 +506,7 @@ function render() {
   $('asof-big').textContent = fmt(str.asOfBig, { date: longDate(m.asOf) });
   $('asof-mut').textContent = fmt(str.asOfMut, { start: shortDM(m.yearStart), date: shortDM(m.asOf) });
   $('btn-reupload').hidden = false;
+  $('btn-share').hidden = false;
 
   // month names for charts
   sd.monthly.yearCur = m.year; sd.monthly.yearPrev = m.prev;
@@ -692,6 +695,8 @@ function render() {
 function renderEmpty() {
   $('asof-box').hidden = true;
   $('btn-reupload').hidden = true;
+  $('btn-share').hidden = true;
+  $('loading').hidden = true;
   $('dashboard').hidden = true;
   $('foot').hidden = true;
   $('uploader').hidden = false;
@@ -703,7 +708,106 @@ function renderEmpty() {
 }
 
 /* ------------------------------------------------------------------ *
- * 6. File handling
+ * 6. Shareable link — embed the computed model in the URL hash.
+ *    No backend: the model (not the raw rows) is compacted, gzipped
+ *    (CompressionStream) and base64url-encoded into '#d='. The hash is
+ *    never sent to the server, so the data stays client-side.
+ * ------------------------------------------------------------------ */
+function bytesToB64url(bytes) {
+  let bin = ''; const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64urlToBytes(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '=';
+  const bin = atob(s), out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function gzipBytes(str) { const s = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip')); return new Uint8Array(await new Response(s).arrayBuffer()); }
+async function gunzipStr(bytes) { const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')); return new TextDecoder().decode(await new Response(s).arrayBuffer()); }
+async function encodeShare(str) {
+  if (typeof CompressionStream !== 'undefined') return 'g' + bytesToB64url(await gzipBytes(str));
+  return 'r' + bytesToB64url(new TextEncoder().encode(str));   // fallback: uncompressed
+}
+async function decodeShare(enc) {
+  const fmt = enc[0], bytes = b64urlToBytes(enc.slice(1));
+  if (fmt === 'g') return await gunzipStr(bytes);
+  if (fmt === 'r') return new TextDecoder().decode(bytes);
+  return await gunzipStr(b64urlToBytes(enc));                  // legacy: no prefix
+}
+
+// compact the two large arrays (objects -> positional arrays, rounded) and back
+const _R = x => Math.round(Number(x) || 0);
+function compactModel(m) {
+  const c = JSON.parse(JSON.stringify(m));
+  c.perf.prodPerf = m.perf.prodPerf.map(r => [r.item, r.name, r.seg, _R(r.ytd), _R(r.units), _R(r.ly), _R(r.fy), _R(r.bo), _R(r.boUnits)]);
+  c.perf.segPerf = m.perf.segPerf.map(r => [r.seg, _R(r.ytd), _R(r.units), _R(r.ly), _R(r.fy), _R(r.bo), _R(r.boUnits)]);
+  return c;
+}
+function hydrateModel(c) {
+  c.perf.prodPerf = c.perf.prodPerf.map(a => ({ item: a[0], name: a[1], seg: a[2], ytd: a[3], units: a[4], ly: a[5], fy: a[6], bo: a[7], boUnits: a[8] }));
+  c.perf.segPerf = c.perf.segPerf.map(a => ({ seg: a[0], ytd: a[1], units: a[2], ly: a[3], fy: a[4], bo: a[5], boUnits: a[6] }));
+  return c;
+}
+
+// copy to clipboard, but never hang: if the async Clipboard API doesn't
+// settle quickly (denied permission / unfocused page), fall back to execCommand.
+function copyText(text) {
+  return new Promise(resolve => {
+    let done = false;
+    const fallback = () => {
+      if (done) return; done = true;
+      let ok = false;
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        ok = document.execCommand('copy'); document.body.removeChild(ta);
+      } catch (e) { ok = false; }
+      resolve(ok);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      const t = setTimeout(fallback, 700);
+      navigator.clipboard.writeText(text).then(
+        () => { if (done) return; done = true; clearTimeout(t); resolve(true); },
+        () => { clearTimeout(t); fallback(); }
+      );
+    } else fallback();
+  });
+}
+
+async function shareCurrent() {
+  if (!MODEL) return;
+  const btn = $('btn-share');
+  btn.disabled = true; btn.textContent = S().shareBuilding;
+  try {
+    const payload = { v: 2, source: SOURCE, model: compactModel(MODEL) };
+    const enc = await encodeShare(JSON.stringify(payload));
+    const url = location.origin + location.pathname + '#d=' + enc;
+    await copyText(url);
+    btn.textContent = S().shareCopied;
+  } catch (e) { console.error('share failed', e); btn.textContent = S().shareErr; }
+  setTimeout(() => { btn.disabled = false; btn.textContent = S().share; }, 1900);
+}
+
+async function loadShared(enc) {
+  $('uploader').hidden = true; $('dashboard').hidden = true; $('foot').hidden = true;
+  const l = $('loading'); l.hidden = false; l.textContent = S().loadingShared;
+  try {
+    const payload = JSON.parse(await decodeShare(enc));
+    MODEL = hydrateModel(payload.model);
+    SOURCE = payload.source || '';
+    render();
+    window.scrollTo(0, 0);
+  } catch (e) {
+    console.error('shared link decode failed', e);
+    MODEL = null; render(); showError(S().errShared);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * 7. File handling
  * ------------------------------------------------------------------ */
 function showError(msg) { const e = $('up-err'); e.hidden = false; e.textContent = msg; }
 function clearError() { $('up-err').hidden = true; }
@@ -748,11 +852,14 @@ function init() {
   ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); if (ev === 'dragleave' && drop.contains(e.relatedTarget)) return; drop.classList.remove('drag'); }));
   drop.addEventListener('drop', e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handleFile(f); });
 
-  $('btn-reupload').addEventListener('click', () => { MODEL = null; SOURCE = ''; $('file-input').value = ''; render(); });
+  $('btn-reupload').addEventListener('click', () => { MODEL = null; SOURCE = ''; $('file-input').value = ''; if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); });
+  $('btn-share').addEventListener('click', shareCurrent);
 
   document.querySelectorAll('#lang-seg .seg-btn').forEach(b => b.addEventListener('click', () => { LANG = b.dataset.lang; localStorage.setItem('mro.lang', LANG); render(); }));
   document.querySelectorAll('#theme-seg .seg-btn').forEach(b => b.addEventListener('click', () => { THEME = b.dataset.themeBtn; localStorage.setItem('mro.theme', THEME); render(); }));
 
-  render();
+  // shared link? decode and render from the URL; otherwise show the uploader
+  if (/^#d=/.test(location.hash)) loadShared(location.hash.slice(3));
+  else render();
 }
 document.addEventListener('DOMContentLoaded', init);

@@ -33,6 +33,7 @@
           <button class="seg-btn active" data-theme-btn="light" type="button" title="Claro / Light">☀</button>
           <button class="seg-btn" data-theme-btn="dark" type="button" title="Oscuro / Dark">☾</button>
         </div>
+        <button class="btn-file btn-share" id="btn-share" type="button" hidden></button>
         <button class="btn-file" id="btn-reupload" type="button" hidden></button>
       </div>
     </div>
@@ -50,6 +51,9 @@
       <div class="err" id="up-err" hidden></div>
     </div>
   </section>
+
+  <!-- ============ LOADING (shared-link decode) ============ -->
+  <div id="loading" class="loading" hidden></div>
 
   <!-- ============ DASHBOARD (rendered after parse) ============ -->
   <main id="dashboard" hidden></main>

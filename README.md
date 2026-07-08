@@ -17,7 +17,27 @@ Built to run on **GitHub Pages** (or any static host).
 - **Light / dark** — theme toggle (top right). Default: light ("clear").
 - **Self-contained** — the XLSX parser ([SheetJS](https://sheetjs.com)) is
   vendored under `assets/vendor/`, so the app works offline once loaded.
+- **Shareable links** — the **Share** button encodes the computed model (not
+  the raw rows) into the URL hash, so a link reproduces the dashboard with no
+  backend. See below.
 - Language and theme choices persist across visits (via `localStorage`).
+
+## Shareable links (no backend)
+
+The **Share** button builds a link that carries the whole dashboard in its URL:
+
+1. The *computed model* (KPIs, monthly totals, markets, the order book, and the
+   per-item/segment tables) is serialized — **not** the ~41k raw rows, which
+   makes it ~30 KB instead of megabytes.
+2. It's compressed with the browser-native `CompressionStream` (gzip) and
+   base64url-encoded into the URL **hash** (`…/#d=…`).
+3. The link is copied to your clipboard. Opening it decodes the hash in the
+   browser and renders the dashboard directly — no upload, no server.
+
+Because the payload lives in the `#hash`, it is **never sent to the web server**
+(GitHub Pages only ever sees the path), so the data stays client-side. The link
+is long (~31k characters) but well within browsers' limits; most chat/email
+clients handle it, though a few tools may truncate very long URLs.
 
 ## Expected workbook format
 

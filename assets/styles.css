@@ -64,6 +64,11 @@ h1{font-size:21px;margin:0;letter-spacing:-.02em;font-weight:750}
 .btn-file{border:1px solid var(--field-border);background:var(--field);color:var(--ink2);
   font:inherit;font-weight:700;font-size:12.5px;padding:6px 12px;border-radius:9px;cursor:pointer}
 .btn-file:hover{background:var(--hover)}
+.btn-file:disabled{opacity:.7;cursor:default}
+.btn-share{border-color:var(--brand);color:var(--brand)}
+.btn-share:hover{background:color-mix(in srgb,var(--brand) 10%,transparent)}
+
+.loading{max-width:640px;margin:80px auto;text-align:center;color:var(--muted);font-size:14px;font-weight:600}
 
 /* ---------- uploader / empty state ---------- */
 .uploader{margin-top:60px;display:flex;justify-content:center}

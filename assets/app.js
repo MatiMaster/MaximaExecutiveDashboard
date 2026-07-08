@@ -793,13 +793,26 @@ async function shareCurrent() {
   setTimeout(() => { btn.disabled = false; btn.textContent = S().share; }, 1900);
 }
 
-async function loadShared(enc) {
+// ---- loading indicator (progress bar) ----
+// wait for the browser to actually paint before running blocking work
+const yieldPaint = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+function showLoading(label) {
   $('uploader').hidden = true; $('dashboard').hidden = true; $('foot').hidden = true;
-  const l = $('loading'); l.hidden = false; l.textContent = S().loadingShared;
+  $('loading').hidden = false; setProgress(0, label);
+}
+function setProgress(pct, label) {
+  const f = $('progress-fill'); if (f) f.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  if (label != null) { const l = $('loading-label'); if (l) l.textContent = label; }
+}
+
+async function loadShared(enc) {
+  showLoading(S().loadingShared); setProgress(30);
   try {
     const payload = JSON.parse(await decodeShare(enc));
+    setProgress(70);
     MODEL = hydrateModel(payload.model);
     SOURCE = payload.source || '';
+    setProgress(100); await yieldPaint();
     render();
     window.scrollTo(0, 0);
   } catch (e) {
@@ -889,24 +902,34 @@ function handleFile(file) {
   clearError();
   if (!file) return;
   SOURCE = file.name;
+  const str = S();
+  showLoading(str.loadReading);              // hide uploader, show the bar immediately
+
   const reader = new FileReader();
-  reader.onload = ev => {
+  // read phase drives the first stretch of the bar (0–35%)
+  reader.onprogress = e => { if (e.lengthComputable) setProgress(5 + (e.loaded / e.total) * 30, str.loadReading); };
+  reader.onerror = () => { MODEL = null; render(); showError(S().errParse); };
+  reader.onload = async ev => {
     try {
+      // each blocking step: bump the bar + label, let it PAINT, then do the work
+      setProgress(40, str.loadParsing); await yieldPaint();
       const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: false });
+      setProgress(70, str.loadComputing); await yieldPaint();
       const data = cleanData(wb);
-      MODEL = computeModel(data);
-      $('uploader').hidden = true;
+      const model = computeModel(data);
+      MODEL = model; SOURCE = file.name;
+      setProgress(100, str.loadRendering); await yieldPaint();
       render();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       console.error(err);
-      const str = S();
-      if (err && err.key === 'errNoSheet') showError(fmt(str.errNoSheet, { sheet: err.sheet }));
-      else if (err && err.key === 'errNoSales') showError(str.errNoSales);
-      else showError(str.errParse);
+      const s = S();
+      MODEL = null; render();                // restores uploader, hides the bar
+      if (err && err.key === 'errNoSheet') showError(fmt(s.errNoSheet, { sheet: err.sheet }));
+      else if (err && err.key === 'errNoSales') showError(s.errNoSales);
+      else showError(s.errParse);
     }
   };
-  reader.onerror = () => showError(S().errParse);
   reader.readAsArrayBuffer(file);
 }
 

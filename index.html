@@ -55,8 +55,11 @@
     </div>
   </section>
 
-  <!-- ============ LOADING (shared-link decode) ============ -->
-  <div id="loading" class="loading" hidden></div>
+  <!-- ============ LOADING (file parse / shared-link decode) ============ -->
+  <div id="loading" class="loading" hidden>
+    <div class="loading-label" id="loading-label"></div>
+    <div class="progress"><div class="progress-fill" id="progress-fill"></div></div>
+  </div>
 
   <!-- ============ DASHBOARD (rendered after parse) ============ -->
   <main id="dashboard" hidden></main>

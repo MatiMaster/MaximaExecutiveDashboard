@@ -17,6 +17,8 @@
       reupload: 'Cambiar archivo',
       share: 'Compartir', shareBuilding: 'Generando…', shareCopied: '✓ Copiado', shareErr: 'Error',
       loadingShared: 'Cargando datos compartidos…',
+      loadReading: 'Leyendo el archivo…', loadParsing: 'Analizando la planilla…',
+      loadComputing: 'Calculando indicadores…', loadRendering: 'Generando el panel…',
       errShared: 'El enlace compartido no es válido o está dañado.',
       sampleText: '¿No conoces el formato?', sampleLink: 'Descargar archivo de ejemplo',
 
@@ -108,6 +110,8 @@
       reupload: 'Change file',
       share: 'Share', shareBuilding: 'Building…', shareCopied: '✓ Copied', shareErr: 'Failed',
       loadingShared: 'Loading shared data…',
+      loadReading: 'Reading the file…', loadParsing: 'Reading the spreadsheet…',
+      loadComputing: 'Computing metrics…', loadRendering: 'Building the dashboard…',
       errShared: 'The shared link is invalid or corrupted.',
       sampleText: 'Not sure about the format?', sampleLink: 'Download a sample file',
 

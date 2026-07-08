@@ -14,7 +14,8 @@ let THEME = localStorage.getItem('mro.theme') || 'light'; // default: clear
 let MODEL = null;      // computed metrics
 let SOURCE = '';       // uploaded file name
 let ITEM_LIMIT = 25;   // top-N for the product performance table
-let BO_MODE = false;   // false = actual sales · true = backorder-adjusted (what-if-fulfilled)
+let BO_SEG = false;    // segment table: false = actual · true = backorder-adjusted
+let BO_PROD = false;   // product table: false = actual · true = backorder-adjusted
 
 const $ = id => document.getElementById(id);
 const S = () => I18N.STR[LANG];
@@ -467,12 +468,12 @@ function limitTools(cur) {
     }).join('') + `</div></div>`;
 }
 
-// view toggle: actual sales vs. backorder-adjusted (what-if-fulfilled)
-function viewTools() {
-  const str = S();
+// per-table view toggle: actual sales vs. backorder-adjusted (what-if-fulfilled)
+function viewTools(kind) {
+  const str = S(), on = kind === 'seg' ? BO_SEG : BO_PROD, attr = 'data-bo' + kind;
   return `<div class="table-tools perf-view"><span class="lbl">${str.perfView}</span><div class="seg">` +
-    `<button class="seg-btn ${!BO_MODE ? 'active' : ''}" data-bomode="0">${str.perfActual}</button>` +
-    `<button class="seg-btn ${BO_MODE ? 'active' : ''}" data-bomode="1">${str.perfBO}</button>` +
+    `<button class="seg-btn ${!on ? 'active' : ''}" ${attr}="0">${str.perfActual}</button>` +
+    `<button class="seg-btn ${on ? 'active' : ''}" ${attr}="1">${str.perfBO}</button>` +
     `</div></div>`;
 }
 
@@ -528,9 +529,11 @@ function render() {
   const whTr = rows => rows.map(([k, v]) => [I18N.wh(k, LANG), v]);
   const topSegName = mk.topSegments.length ? I18N.seg(mk.topSegments[0][0], LANG) : '—';
 
-  // product-performance view mode (actual vs. backorder-adjusted)
-  const perfMode = BO_MODE ? 'bo' : 'actual';
-  const perfAbbr = BO_MODE ? str.abbrPerfBO : fmt(str.abbrPerf, { prev: m.prev, year: m.year });
+  // per-table view mode + abbreviation line (actual vs. backorder-adjusted)
+  const segMode = BO_SEG ? 'bo' : 'actual', prodMode = BO_PROD ? 'bo' : 'actual';
+  const abbrActual = fmt(str.abbrPerf, { prev: m.prev, year: m.year });
+  const segAbbr = BO_SEG ? str.abbrPerfBO : abbrActual;
+  const prodAbbr = BO_PROD ? str.abbrPerfBO : abbrActual;
 
   $('dashboard').hidden = false;
   $('dashboard').innerHTML = `
@@ -643,20 +646,20 @@ function render() {
     </div>
   </div>
 
-  <!-- Section 6 — product performance (actual ⇄ backorder-adjusted via toggle) -->
+  <!-- Section 6 — product performance (each table toggles actual ⇄ backorder-adjusted) -->
   <div class="section">
     <div class="shead"><div class="snum">6</div><div><h2>${str.s6h}</h2><div class="st">${str.s6st}</div></div></div>
-    ${viewTools()}
     <div class="card">
       <div class="card-title">${str.tblSeg}</div>
-      <div class="abbr">${perfAbbr}</div>
-      ${perfTable(false, perfMode, pf.segPerf)}
+      <div class="perf-ctrls">${viewTools('seg')}</div>
+      <div class="abbr">${segAbbr}</div>
+      ${perfTable(false, segMode, pf.segPerf)}
     </div>
     <div class="card mt16">
       <div class="card-title">${str.tblProd}</div>
-      <div class="abbr">${perfAbbr}</div>
-      ${limitTools(ITEM_LIMIT)}
-      ${perfTable(true, perfMode, pf.prodPerf, ITEM_LIMIT)}
+      <div class="perf-ctrls">${viewTools('prod')}${limitTools(ITEM_LIMIT)}</div>
+      <div class="abbr">${prodAbbr}</div>
+      ${perfTable(true, prodMode, pf.prodPerf, ITEM_LIMIT)}
     </div>
   </div>`;
 
@@ -669,12 +672,14 @@ function render() {
     `<span style="flex:${bp};background:var(--bo);color:#fff">${Math.round(bp)}%</span>`;
   wireTips('#chart-trend rect'); wireTips('#chart-cum circle');
 
-  // product-performance controls: view toggle (animated re-rank) + top-N
-  document.querySelectorAll('[data-bomode]').forEach(b => b.onclick = () => {
-    const next = b.dataset.bomode === '1';
-    if (next === BO_MODE) return;
-    const prev = captureRowRects();
-    BO_MODE = next; render(); flipRerank(prev);
+  // per-table view toggles (animated re-rank) + product top-N
+  document.querySelectorAll('[data-boseg]').forEach(b => b.onclick = () => {
+    const next = b.dataset.boseg === '1'; if (next === BO_SEG) return;
+    const prev = captureRowRects(); BO_SEG = next; render(); flipRerank(prev);
+  });
+  document.querySelectorAll('[data-boprod]').forEach(b => b.onclick = () => {
+    const next = b.dataset.boprod === '1'; if (next === BO_PROD) return;
+    const prev = captureRowRects(); BO_PROD = next; render(); flipRerank(prev);
   });
   document.querySelectorAll('[data-plimit]').forEach(b => b.onclick = () => { ITEM_LIMIT = b.dataset.plimit === 'all' ? Infinity : Number(b.dataset.plimit); render(); });
 

@@ -146,6 +146,8 @@ h1{font-size:21px;margin:0;letter-spacing:-.02em;font-weight:750}
 .abbr{color:var(--muted);font-size:11.5px;margin:2px 0 12px;line-height:1.5}
 .abbr b{color:var(--ink2)}
 .table-tools{display:flex;align-items:center;gap:9px;margin:0 0 12px}
+.perf-ctrls{display:flex;align-items:center;gap:14px 28px;flex-wrap:wrap}
+.perf-ctrls .table-tools{margin:0 0 10px}
 .table-tools .lbl{color:var(--muted);font-size:11.5px;font-weight:650;text-transform:uppercase;letter-spacing:.06em}
 .ptable-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:9px}
 .ptable{width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px}

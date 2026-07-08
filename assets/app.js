@@ -432,13 +432,14 @@ function perfTable(isProduct, mode, list, limit) {
   const rows = list.slice().sort((a, b) => val(b) - val(a)).slice(0, limit || list.length);
   if (!rows.length) return `<div class="note">${str.noItems}</div>`;
 
-  const H = [{ label: '#', num: true }, { label: isProduct ? str.colProduct : str.colSegment }];
-  if (isProduct) H.push({ label: str.colSegment });
-  H.push({ label: str.colYTD, num: true });
-  if (bo) { H.push({ label: str.colBO, num: true }); H.push({ label: str.colAdj, num: true }); }
-  else H.push({ label: str.colUnits, num: true });
-  H.push({ label: fmt(str.colSP, { prev }), num: true }, { label: str.colDSP, num: true }, { label: str.colPSP, num: true });
-  H.push({ label: fmt(str.colFY, { prev }), num: true }, { label: str.colDFY, num: true }, { label: str.colPFY, num: true });
+  const H = [{ label: '#', num: true, tip: str.tipRank },
+             { label: isProduct ? str.colProduct : str.colSegment, tip: isProduct ? str.tipProduct : str.tipSegment }];
+  if (isProduct) H.push({ label: str.colSegment, tip: str.tipSegment });
+  H.push({ label: str.colYTD, num: true, tip: str.tipYTD });
+  if (bo) { H.push({ label: str.colBO, num: true, tip: str.tipBO }); H.push({ label: str.colAdj, num: true, tip: str.tipAdj }); }
+  else H.push({ label: str.colUnits, num: true, tip: str.tipUnits });
+  H.push({ label: fmt(str.colSP, { prev }), num: true, tip: fmt(str.tipSP, { prev }) }, { label: str.colDSP, num: true, tip: fmt(str.tipDSP, { prev }) }, { label: str.colPSP, num: true, tip: fmt(str.tipPSP, { prev }) });
+  H.push({ label: fmt(str.colFY, { prev }), num: true, tip: fmt(str.tipFY, { prev }) }, { label: str.colDFY, num: true, tip: fmt(str.tipDFY, { prev }) }, { label: str.colPFY, num: true, tip: fmt(str.tipPFY, { prev }) });
 
   const body = rows.map((r, i) => {
     const base = val(r), dsp = base - r.ly, dfy = base - r.fy;
@@ -455,7 +456,7 @@ function perfTable(isProduct, mode, list, limit) {
     return { key, cells: c };
   });
 
-  return `<div class="ptable-wrap"><table class="ptable"><thead><tr>${H.map(h => `<th class="${h.num ? 'num' : ''}">${esc(h.label)}</th>`).join('')}</tr></thead><tbody>${body.map(row => `<tr data-key="${esc(row.key)}">${row.cells.map(x => `<td class="${x.cls || ''}">${x.html || esc(x.v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  return `<div class="ptable-wrap"><table class="ptable"><thead><tr>${H.map(h => `<th class="${h.num ? 'num' : ''}"${h.tip ? ` data-tip="${esc(h.tip)}"` : ''}>${esc(h.label)}</th>`).join('')}</tr></thead><tbody>${body.map(row => `<tr data-key="${esc(row.key)}">${row.cells.map(x => `<td class="${x.cls || ''}">${x.html || esc(x.v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 
 // top-N segmented control for the product table
@@ -670,7 +671,7 @@ function render() {
   $('comp').innerHTML =
     `<span style="flex:${rp};background:var(--ready);color:var(--on-neutral)">${Math.round(rp)}%</span>` +
     `<span style="flex:${bp};background:var(--bo);color:#fff">${Math.round(bp)}%</span>`;
-  wireTips('#chart-trend rect'); wireTips('#chart-cum circle');
+  wireTips('#chart-trend rect'); wireTips('#chart-cum circle'); wireTips('.ptable th[data-tip]');
 
   // per-table view toggles (animated re-rank) + product top-N
   document.querySelectorAll('[data-boseg]').forEach(b => b.onclick = () => {

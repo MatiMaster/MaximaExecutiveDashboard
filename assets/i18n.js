@@ -79,9 +79,22 @@
       colProduct: 'Producto', colSegment: 'Segmento', colYTD: 'Ventas año', colUnits: 'Unid.',
       colSP: 'MP {prev}', colDSP: 'Δ MP', colPSP: '% MP', colFY: 'AC {prev}', colDFY: 'Δ AC', colPFY: '% AC',
       colBO: 'Backorder', colAdj: 'Ajustado',
+      tipRank: 'Posición en el ranking',
+      tipProduct: 'Código (SKU) y nombre del producto',
+      tipSegment: 'Línea o segmento de producto',
+      tipYTD: 'Ventas año — ventas netas acumuladas del año, del 1 de enero a la fecha de corte',
+      tipUnits: 'Unidades vendidas en el período',
+      tipBO: 'Backorder — valor pedido y a la espera de stock (precio unitario × unidades en backorder)',
+      tipAdj: 'Ajustado — Ventas año + Backorder (ventas potenciales si se despacha el backorder)',
+      tipSP: 'MP {prev} — mismo período del año anterior: 1 de enero a la fecha de corte',
+      tipDSP: 'Δ MP — diferencia frente al mismo período de {prev}',
+      tipPSP: '% MP — variación porcentual frente al mismo período de {prev}',
+      tipFY: 'AC {prev} — año completo {prev}: los 12 meses del año anterior',
+      tipDFY: 'Δ AC — diferencia frente al año completo {prev}',
+      tipPFY: '% AC — variación porcentual frente al año completo {prev}',
       showN: 'Mostrar', showAll: 'Todos', noItems: 'Sin productos para el período seleccionado.',
 
-      foot: 'Panel ejecutivo · Fuente: <b>{source}</b> · datos al {date}. La cartera de pedidos se descompone en <b>pedido = por despachar (comprometido) + en backorder + ya despachado</b>. Exclusiones de la fuente (Oscar Riquelme, CMM02359, líneas de subtotal) aplicadas. Todos los valores se calculan a partir del archivo cargado.'
+      foot: 'Panel ejecutivo · Fuente: <b>{source}</b> · datos al {date}. La cartera de pedidos se descompone en <b>pedido = por despachar (comprometido) + en backorder + ya despachado</b>. Todos los valores se calculan a partir del archivo cargado.'
     },
     en: {
       title: 'MRO International — Executive Summary',
@@ -153,9 +166,22 @@
       colProduct: 'Product', colSegment: 'Segment', colYTD: 'YTD sales', colUnits: 'Units',
       colSP: 'SP {prev}', colDSP: 'Δ SP', colPSP: '% SP', colFY: 'FY {prev}', colDFY: 'Δ FY', colPFY: '% FY',
       colBO: 'Backorder', colAdj: 'Adjusted',
+      tipRank: 'Rank position',
+      tipProduct: 'Product code (SKU) and name',
+      tipSegment: 'Product line or segment',
+      tipYTD: 'YTD sales — net sales year-to-date, from January 1 to the as-of date',
+      tipUnits: 'Units sold during the period',
+      tipBO: 'Backorder — value ordered and awaiting stock (unit price × units on backorder)',
+      tipAdj: 'Adjusted — YTD sales + Backorder (potential sales if the backorder ships)',
+      tipSP: 'SP {prev} — same period last year: January 1 to the as-of date',
+      tipDSP: 'Δ SP — difference vs. the same period in {prev}',
+      tipPSP: '% SP — percentage change vs. the same period in {prev}',
+      tipFY: 'FY {prev} — full year {prev}: all 12 months of the prior year',
+      tipDFY: 'Δ FY — difference vs. full year {prev}',
+      tipPFY: '% FY — percentage change vs. full year {prev}',
       showN: 'Show', showAll: 'All', noItems: 'No products for the selected period.',
 
-      foot: 'Executive panel · Source: <b>{source}</b> · data as of {date}. The order backlog breaks down as <b>ordered = to ship (committed) + on backorder + already shipped</b>. Source exclusions (Oscar Riquelme, CMM02359, subtotal lines) applied. All values are computed from the uploaded file.'
+      foot: 'Executive panel · Source: <b>{source}</b> · data as of {date}. The order backlog breaks down as <b>ordered = to ship (committed) + on backorder + already shipped</b>. All values are computed from the uploaded file.'
     }
   };
 

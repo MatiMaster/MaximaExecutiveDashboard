@@ -1,0 +1,9 @@
+{
+  "name": "maxima-executive-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Client-side executive dashboard for MRO International. Static site; this package.json exists only to run the calculation test suite.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

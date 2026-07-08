@@ -41,7 +41,7 @@ body{border-top:4px solid var(--brand)}
 .wrap{max-width:1180px;margin:0 auto;padding:26px 24px 64px}
 
 /* ---------- header ---------- */
-header{display:flex;justify-content:space-between;align-items:center;gap:18px;
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;
   flex-wrap:wrap;padding-bottom:20px;margin-bottom:8px;border-bottom:1px solid var(--border)}
 .brand{display:flex;align-items:center;gap:14px}
 .brand-logo-wrap{background:#fff;border:1px solid var(--border);border-radius:9px;
@@ -50,11 +50,11 @@ header{display:flex;justify-content:space-between;align-items:center;gap:18px;
 h1{font-size:21px;margin:0;letter-spacing:-.02em;font-weight:750}
 .brand .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
 
-.controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end}
+.controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .asof{text-align:right;font-size:12.5px;color:var(--ink2)}
 .asof .big{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
 .asof .mut{color:var(--muted)}
-.toggle-group{display:flex;align-items:center;gap:9px}
+.toggle-group{display:flex;align-items:center;gap:8px}
 .seg{display:inline-flex;background:var(--field);border:1px solid var(--field-border);
   border-radius:9px;padding:2px;gap:2px}
 .seg-btn{border:0;background:transparent;color:var(--ink2);font:inherit;font-weight:700;
@@ -66,7 +66,7 @@ h1{font-size:21px;margin:0;letter-spacing:-.02em;font-weight:750}
 .btn-file:hover{background:var(--hover)}
 .btn-file:disabled{opacity:.7;cursor:default}
 .btn-share{border-color:var(--brand);color:var(--brand);
-  min-width:112px;text-align:center;white-space:nowrap}   /* fixed width so state changes never reflow the header */
+  min-width:106px;text-align:center;white-space:nowrap}   /* fixed width so state changes never reflow the header */
 .btn-share:hover{background:color-mix(in srgb,var(--brand) 10%,transparent)}
 
 .loading{max-width:640px;margin:90px auto;text-align:center}

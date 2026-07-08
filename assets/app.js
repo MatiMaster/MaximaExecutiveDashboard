@@ -794,8 +794,14 @@ async function shareCurrent() {
 }
 
 // ---- loading indicator (progress bar) ----
-// wait for the browser to actually paint before running blocking work
-const yieldPaint = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+// Wait for the browser to paint before running blocking work. rAF gives us the
+// paint, but it's PAUSED in background/unfocused tabs — so race it against a
+// timeout fallback, otherwise the parse would hang if the tab isn't visible.
+const yieldPaint = () => new Promise(r => {
+  let done = false; const fin = () => { if (!done) { done = true; r(); } };
+  requestAnimationFrame(() => requestAnimationFrame(fin));
+  setTimeout(fin, 60);
+});
 function showLoading(label) {
   $('uploader').hidden = true; $('dashboard').hidden = true; $('foot').hidden = true;
   $('loading').hidden = false; setProgress(0, label);

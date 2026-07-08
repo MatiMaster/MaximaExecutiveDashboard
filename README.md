@@ -55,6 +55,10 @@ so column order can vary):
 present (`Target` is parsed but not yet displayed). The sheet named `Target` here
 was `26_Target` in the original source report.
 
+The upload screen has a **"Download a sample file"** link that generates a valid
+`.xlsx` (obfuscated dummy data) with all four sheets and the exact column
+layout, so you can see precisely what to upload.
+
 ## How the numbers are computed
 
 The build applies the same cleaning rules as the source report, then computes:

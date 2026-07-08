@@ -15,9 +15,10 @@
       asOfBig: 'Al {date}',
       asOfMut: 'Acumulado del año: {start} – {date}',
       reupload: 'Cambiar archivo',
-      share: 'Compartir', shareBuilding: 'Generando…', shareCopied: '✓ Enlace copiado', shareErr: 'Error al generar',
+      share: 'Compartir', shareBuilding: 'Generando…', shareCopied: '✓ Copiado', shareErr: 'Error',
       loadingShared: 'Cargando datos compartidos…',
       errShared: 'El enlace compartido no es válido o está dañado.',
+      sampleText: '¿No conoces el formato?', sampleLink: 'Descargar archivo de ejemplo',
 
       upTitle: 'Cargar archivo de datos',
       upSub: 'Arrastra un archivo <b>.xlsx</b> aquí o haz clic para seleccionarlo.',
@@ -105,9 +106,10 @@
       asOfBig: 'As of {date}',
       asOfMut: 'Year to date: {start} – {date}',
       reupload: 'Change file',
-      share: 'Share', shareBuilding: 'Building…', shareCopied: '✓ Link copied', shareErr: 'Build failed',
+      share: 'Share', shareBuilding: 'Building…', shareCopied: '✓ Copied', shareErr: 'Failed',
       loadingShared: 'Loading shared data…',
       errShared: 'The shared link is invalid or corrupted.',
+      sampleText: 'Not sure about the format?', sampleLink: 'Download a sample file',
 
       upTitle: 'Load data file',
       upSub: 'Drag an <b>.xlsx</b> file here, or click to choose one.',

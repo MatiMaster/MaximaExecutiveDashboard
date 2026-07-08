@@ -705,6 +705,8 @@ function renderEmpty() {
   $('up-sub').innerHTML = str.upSub;
   $('btn-browse').textContent = str.upBrowse;
   $('up-fmt').innerHTML = str.upFmt;
+  $('up-sample-text').textContent = str.sampleText;
+  $('btn-sample').textContent = str.sampleLink;
 }
 
 /* ------------------------------------------------------------------ *
@@ -807,7 +809,78 @@ async function loadShared(enc) {
 }
 
 /* ------------------------------------------------------------------ *
- * 7. File handling
+ * 7. Sample workbook — dummy (obfuscated) data in the exact format,
+ *    generated in the browser with SheetJS so users see what to upload.
+ * ------------------------------------------------------------------ */
+function buildSampleWorkbook() {
+  const REPS = ['Alex Rivera', 'Jordan Kim', 'Sam Okafor', 'Chris Dubois'];
+  const WH = ['MXWHS', 'EU Warehouse', 'ProWHS', 'VTNWH-MX'];
+  const CUSTS = [
+    { id: 'I/9001', name: 'I/9001 ACME MOTO DISTRIBUTION', country: 'Australia', ctype: 'EX-ASIA', cat: 'International Distributor' },
+    { id: 'I/9002', name: 'I/9002 GLOBEX POWERSPORTS', country: 'Chile', ctype: 'EX-LATAM', cat: 'International Distributor' },
+    { id: 'I/9003', name: 'I/9003 INITECH LUBRICANTS', country: 'Mexico', ctype: 'EX-LATAM', cat: 'International Distributor' },
+    { id: 'I/9004', name: 'I/9004 UMBRELLA MOTORSPORT', country: 'Germany', ctype: 'EX-EU', cat: 'International Distributor' },
+    { id: 'I/9005', name: 'I/9005 HOOLI RACING', country: 'Japan', ctype: 'EX-ASIA', cat: 'International Distributor' },
+    { id: 'I/9006', name: 'I/9006 VEHEMENT DISTRIBUTION', country: 'Brazil', ctype: 'EX-LATAM', cat: 'International Distributor' }
+  ];
+  const ITEMS = [
+    { sku: 'AA-1001', memo: 'SYNTHETIC 4T 10W40 / 1 LTR', seg: '4T Engine Oils', up: 38 },
+    { sku: 'AA-2002', memo: '2T RACING PREMIX / 1 LTR', seg: '2T Engine Oils', up: 30 },
+    { sku: 'AE-3003', memo: 'CHAIN LUBE AEROSOL / 400 ML', seg: 'Aerosols', up: 22 },
+    { sku: 'SU-4004', memo: 'FORK OIL 5W / 1 LTR', seg: 'Suspension Oils', up: 41 },
+    { sku: 'MN-5005', memo: 'CONTACT CLEANER / 500 ML', seg: 'Maintenance', up: 18 },
+    { sku: 'TG-6006', memo: 'GEAR OIL 80W90 / 1 LTR', seg: 'Trans & Gear Oils', up: 34 }
+  ];
+  const pad = n => String(n).padStart(2, '0');
+
+  const salesHead = ['ID', 'Customer', 'Sales Rep', 'Transaction Type', 'Date', 'Document Number', 'Item', 'Memo', 'Subsidiary: Name', 'Customer Category: Name', 'Quantity', 'Unit Price', 'Amount (Foreign Currency)', 'Amount', 'Customer/Project: Customer Type', 'Inventory Location: Name', 'Address: Billing Address Country Name', 'Product Segment', 'SO Date'];
+  const sales = [salesHead];
+  let doc = 50000;
+  const addSale = (y, m, d, ci, ii, qty) => {
+    const c = CUSTS[ci % CUSTS.length], it = ITEMS[ii % ITEMS.length], rep = REPS[(ci + ii) % REPS.length];
+    const amt = Math.round(qty * it.up * 100) / 100;
+    sales.push([c.id, c.name, rep, 'Invoice', `${y}-${pad(m)}-${pad(d)}`, 'INV' + (doc++), it.sku, it.memo,
+      'Maxima Racing Oils', c.cat, qty, it.up, amt, amt, c.ctype, WH[ci % WH.length], c.country, it.seg, '']);
+  };
+  for (let m = 1; m <= 12; m++) for (let ci = 0; ci < CUSTS.length; ci++) for (let ii = 0; ii < ITEMS.length; ii++)
+    if ((m + ci + ii) % 2 === 0) addSale(2025, m, 15, ci, ii, 300 + ((m * 37 + ci * 53 + ii * 71) % 900));
+  for (let m = 1; m <= 6; m++) for (let ci = 0; ci < CUSTS.length; ci++) for (let ii = 0; ii < ITEMS.length; ii++)
+    if ((m + ci + ii) % 2 === 1) addSale(2026, m, 10, ci, ii, 350 + ((m * 41 + ci * 47 + ii * 59) % 1000));
+  addSale(2026, 7, 1, 0, 0, 800); addSale(2026, 7, 2, 2, 3, 600);   // partial current month
+
+  const target = [['ID', 'Amount', 'Country', 'Customer Type', 'Type']];
+  CUSTS.forEach((c, i) => target.push([c.id, 100000 + i * 25000, c.country, c.ctype, 'Target']));
+
+  const pffHead = ['Item Type', 'Item', 'Description (Sales)', 'Date', 'Transaction Type', 'Primary Sales Rep', 'Document Number', 'Customer', 'Ordered', 'Fulfilled', 'Committed', 'Back Ordered', 'Subsidiary: Name', 'Aggregate Amount', 'Unit Price', 'Location', 'Validated Status'];
+  const pff = [pffHead];
+  let so = 70000;
+  CUSTS.forEach((c, ci) => ITEMS.forEach((it, ii) => {
+    if ((ci + ii) % 3 !== 0) return;
+    const ord = 500 + ((ci * 137 + ii * 211) % 2500), bo = ii % 2 === 0 ? Math.round(ord * 0.3) : 0, com = ord - bo;
+    pff.push(['Assembly', it.sku, it.memo, `2026-${pad((ii % 6) + 1)}-20`, 'Sales Order', REPS[(ci + ii) % REPS.length], 'SO' + (so++),
+      c.name, ord, 0, com, bo, 'Maxima Racing Oils', Math.round(ord * it.up * 100) / 100, it.up, WH[ci % WH.length],
+      bo > 0 ? 'Partially Fulfilled' : 'Pending Fulfillment', it.seg]);
+  }));
+
+  const ifHead = ['Internal ID', 'Subsidiary', 'Date', 'Type', 'Document Number', 'Transaction Number', 'Name', 'PO/Check Number', 'Status', 'Memo', 'Amount (Foreign Currency)', 'Amount', 'Category', 'Sales Rep', 'Location', 'Shipping Country', 'Terms', 'Created'];
+  const ifs = [ifHead];
+  for (let i = 0; i < 6; i++) ifs.push([2700000 + i, 'MRO Holding : Maxima Racing Oils', `2026-06-${pad(10 + i)}`, 'Item Fulfillment', 'IF' + (46000 + i),
+    'ITEMSHIP' + (46000 + i), CUSTS[i].name, '', 'Released', 'Sample fulfillment', 0, 0, 'Retail/Web', REPS[i % REPS.length], 'MXWHS', 'United States', '', 'SO' + (70000 + i)]);
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sales), 'Sales');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(target), 'Target');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pff), 'PendingFullFill');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ifs), 'IF');
+  return wb;
+}
+function downloadSample() {
+  try { XLSX.writeFile(buildSampleWorkbook(), 'MRO_sample_data.xlsx'); }
+  catch (e) { console.error('sample build failed', e); }
+}
+
+/* ------------------------------------------------------------------ *
+ * 8. File handling
  * ------------------------------------------------------------------ */
 function showError(msg) { const e = $('up-err'); e.hidden = false; e.textContent = msg; }
 function clearError() { $('up-err').hidden = true; }
@@ -854,6 +927,7 @@ function init() {
 
   $('btn-reupload').addEventListener('click', () => { MODEL = null; SOURCE = ''; $('file-input').value = ''; if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); });
   $('btn-share').addEventListener('click', shareCurrent);
+  $('btn-sample').addEventListener('click', downloadSample);
 
   document.querySelectorAll('#lang-seg .seg-btn').forEach(b => b.addEventListener('click', () => { LANG = b.dataset.lang; localStorage.setItem('mro.lang', LANG); render(); }));
   document.querySelectorAll('#theme-seg .seg-btn').forEach(b => b.addEventListener('click', () => { THEME = b.dataset.themeBtn; localStorage.setItem('mro.theme', THEME); render(); }));

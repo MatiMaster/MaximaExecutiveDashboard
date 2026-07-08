@@ -54,6 +54,14 @@ The build applies the same cleaning rules as the source report, then computes:
   open value `Σ Aggregate Amount`; committed/ready value `Σ (Unit Price × Committed)`;
   backorder value `Σ (Unit Price × Back Ordered)`; distinct SOs and customers;
   breakdowns by warehouse and by customer.
+- **Product performance** — per-segment and per-product ranked tables (top-N
+  selectable): YTD sales, units, vs. same period last year, vs. full prior year.
+  Products are keyed by item SKU (shared between `Sales` and `PendingFullFill`).
+- **Backorder-adjusted performance** — the same ranking with a *what-if-fulfilled*
+  adjustment: `Adjusted = YTD sales + Σ (Unit Price × Back Ordered)` per item,
+  re-ranked by the adjusted total. Items with large backlogs rise; backordered
+  items with no invoiced sales appear as new demand. Per-item backorder amounts
+  sum exactly to the open book's total backorder value.
 
 ## Run locally
 

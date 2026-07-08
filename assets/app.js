@@ -13,6 +13,8 @@ let LANG = localStorage.getItem('mro.lang') || 'es';   // default: Spanish
 let THEME = localStorage.getItem('mro.theme') || 'light'; // default: clear
 let MODEL = null;      // computed metrics
 let SOURCE = '';       // uploaded file name
+let ITEM_LIMIT = 25;   // top-N for the product performance table
+let ITEM_LIMIT_BO = 25;// top-N for the backorder-adjusted product table
 
 const $ = id => document.getElementById(id);
 const S = () => I18N.STR[LANG];
@@ -22,7 +24,8 @@ const fmt = (tpl, vars) => String(tpl).replace(/\{(\w+)\}/g, (_, k) => (vars && 
  * 1. Formatting (locale-aware)
  * ------------------------------------------------------------------ */
 const locale = () => LANG === 'es' ? 'es-CL' : 'en-US';
-const full = n => '$' + Math.round(Number(n) || 0).toLocaleString(locale());
+const full = n => { n = Math.round(Number(n) || 0); return (n < 0 ? '-' : '') + '$' + Math.abs(n).toLocaleString(locale()); };
+const signed = n => (Number(n) > 0 ? '+' : '') + full(n);
 const num = n => Math.round(Number(n) || 0).toLocaleString(locale());
 function short(n) {
   n = Number(n) || 0; const a = Math.abs(n);
@@ -264,6 +267,46 @@ function computeModel(data) {
   for (const st of statusOfDoc.values()) statusCount.set(st, (statusCount.get(st) || 0) + 1);
   const status = [...statusCount.entries()].sort((a, b) => b[1] - a[1]);
 
+  // ---- product / segment performance (YTD vs same-period-LY vs full prior year) ----
+  const fyFrom = prev + '-01-01', fyTo = prev + '-12-31';
+  const topLabel = (counts) => { let best = '', n = -1; for (const [k, c] of counts) if (c > n) { n = c; best = k; } return best; };
+
+  // per-item aggregation across the three windows, in one pass over all sales
+  const items = new Map();
+  const ensureItem = it => { if (!items.has(it)) items.set(it, { item: it, ytd: 0, units: 0, ly: 0, fy: 0, bo: 0, boUnits: 0, _names: new Map(), _segs: new Map() }); return items.get(it); };
+  sales.forEach(r => {
+    if (!r.item) return;
+    const o = ensureItem(r.item);
+    if (r.memo) o._names.set(r.memo, (o._names.get(r.memo) || 0) + 1);
+    if (r.seg) o._segs.set(r.seg, (o._segs.get(r.seg) || 0) + 1);
+    if (inR(r.d, ytdFrom, ytdTo)) { o.ytd += r.amt; o.units += r.q; }
+    if (inR(r.d, lyFrom, lyTo)) o.ly += r.amt;
+    if (inR(r.d, fyFrom, fyTo)) o.fy += r.amt;
+  });
+  // fold in backorders by item (value = unit price × units on backorder)
+  pff.filter(r => r.bo > 0 && r.item).forEach(r => {
+    const o = ensureItem(r.item);
+    o.bo += r.up * r.bo; o.boUnits += r.bo;
+    if (r.desc) o._names.set(r.desc, (o._names.get(r.desc) || 0) + 1);
+    if (r.seg) o._segs.set(r.seg, (o._segs.get(r.seg) || 0) + 1);
+  });
+  const prodPerf = [...items.values()].map(o => ({
+    item: o.item, name: topLabel(o._names) || o.item, seg: topLabel(o._segs),
+    ytd: o.ytd, units: o.units, ly: o.ly, fy: o.fy, bo: o.bo, boUnits: o.boUnits
+  }));
+
+  // per-segment aggregation (same windows + backorder)
+  const segs = new Map();
+  const ensureSeg = s => { if (!segs.has(s)) segs.set(s, { seg: s, ytd: 0, units: 0, ly: 0, fy: 0, bo: 0, boUnits: 0 }); return segs.get(s); };
+  sales.forEach(r => {
+    const s = r.seg || ''; const o = ensureSeg(s);
+    if (inR(r.d, ytdFrom, ytdTo)) { o.ytd += r.amt; o.units += r.q; }
+    if (inR(r.d, lyFrom, lyTo)) o.ly += r.amt;
+    if (inR(r.d, fyFrom, fyTo)) o.fy += r.amt;
+  });
+  pff.filter(r => r.bo > 0).forEach(r => { const o = ensureSeg(r.seg || ''); o.bo += r.up * r.bo; o.boUnits += r.bo; });
+  const segPerf = [...segs.values()];
+
   return {
     asOf, year, prev, yearStart,
     sales: { ytd, ly, delta, deltaPct, activeCustomers, countries, monthly },
@@ -277,6 +320,7 @@ function computeModel(data) {
       readyCust: topBy(pff, r => r.c, r => r.up * r.com, 5),
       readyShare: openValue ? readyValue / openValue : 0
     },
+    perf: { prodPerf, segPerf },
     counts: { sales: sales.length, pff: pff.length, target: target.length, ifs: ifs.length }
   };
 }
@@ -345,6 +389,53 @@ function hbarsHTML(rows, colorVar) {
 }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m])); }
 
+// delta cell: signed money, colored by direction
+const dCls = n => 'num ' + (n > 0 ? 'good' : n < 0 ? 'bad' : '');
+const deltaCell = n => ({ v: signed(n), cls: dCls(n) });
+const pctCell = (x, ref) => ({ v: (x > 0 ? '+' : '') + pct1(x), cls: dCls(ref) });
+
+// generic performance table (actual or backorder-adjusted)
+function perfTable(isProduct, mode, list, limit) {
+  const str = S(), bo = mode === 'bo', prev = MODEL.prev;
+  const val = r => bo ? r.ytd + r.bo : r.ytd;              // sort / comparison base
+  const rows = list.slice().sort((a, b) => val(b) - val(a)).slice(0, limit || list.length);
+  if (!rows.length) return `<div class="note">${str.noItems}</div>`;
+
+  const H = [{ label: '#', num: true }, { label: isProduct ? str.colProduct : str.colSegment }];
+  if (isProduct) H.push({ label: str.colSegment });
+  H.push({ label: str.colYTD, num: true });
+  if (bo) { H.push({ label: str.colBO, num: true }); H.push({ label: str.colAdj, num: true }); }
+  else H.push({ label: str.colUnits, num: true });
+  H.push({ label: fmt(str.colSP, { prev }), num: true }, { label: str.colDSP, num: true }, { label: str.colPSP, num: true });
+  H.push({ label: fmt(str.colFY, { prev }), num: true }, { label: str.colDFY, num: true }, { label: str.colPFY, num: true });
+
+  const body = rows.map((r, i) => {
+    const base = val(r), dsp = base - r.ly, dfy = base - r.fy;
+    const c = [{ v: i + 1, cls: 'rank' }];
+    if (isProduct) c.push({ html: `<b>${esc(r.item)}</b><span>${esc(r.name)}</span>`, cls: 'name' });
+    else c.push({ v: r.seg ? I18N.seg(r.seg, LANG) : 'N/A', cls: 'strong' });
+    if (isProduct) c.push({ v: r.seg ? I18N.seg(r.seg, LANG) : 'N/A' });
+    c.push({ v: full(r.ytd), cls: 'num' });
+    if (bo) { c.push({ v: r.bo ? full(r.bo) : '—', cls: 'num' }); c.push({ v: full(base), cls: 'num strong' }); }
+    else c.push({ v: num(r.units), cls: 'num' });
+    c.push({ v: full(r.ly), cls: 'num' }, deltaCell(dsp), pctCell(r.ly ? dsp / r.ly : 0, dsp));
+    c.push({ v: full(r.fy), cls: 'num' }, deltaCell(dfy), pctCell(r.fy ? dfy / r.fy : 0, dfy));
+    return c;
+  });
+
+  return `<div class="ptable-wrap"><table class="ptable"><thead><tr>${H.map(h => `<th class="${h.num ? 'num' : ''}">${esc(h.label)}</th>`).join('')}</tr></thead><tbody>${body.map(cs => `<tr>${cs.map(x => `<td class="${x.cls || ''}">${x.html || esc(x.v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+
+// top-N segmented control for a product table ('p' = actual, 'b' = backorder)
+function limitTools(kind, cur) {
+  const str = S(), attr = kind === 'p' ? 'data-plimit' : 'data-blimit';
+  return `<div class="table-tools"><span class="lbl">${str.showN}</span><div class="seg">` +
+    [10, 25, 50, 'all'].map(v => {
+      const target = v === 'all' ? Infinity : v, label = v === 'all' ? str.showAll : v;
+      return `<button class="seg-btn ${cur === target ? 'active' : ''}" ${attr}="${v}">${label}</button>`;
+    }).join('') + `</div></div>`;
+}
+
 /* ------------------------------------------------------------------ *
  * 5. Render
  * ------------------------------------------------------------------ */
@@ -364,7 +455,7 @@ function render() {
 
   if (!MODEL) { renderEmpty(); return; }
 
-  const m = MODEL, sd = m.sales, bk = m.book, mk = m.markets;
+  const m = MODEL, sd = m.sales, bk = m.book, mk = m.markets, pf = m.perf;
 
   // as-of box
   $('asof-box').hidden = false;
@@ -506,6 +597,38 @@ function render() {
         <div class="mini-t">${str.byCust}</div>${hbarsHTML(bk.readyCust, '--ready')}
       </div>
     </div>
+  </div>
+
+  <!-- Section 6 — product performance -->
+  <div class="section">
+    <div class="shead"><div class="snum">6</div><div><h2>${str.s6h}</h2><div class="st">${str.s6st}</div></div></div>
+    <div class="card">
+      <div class="card-title">${str.tblSeg}</div>
+      <div class="abbr">${fmt(str.abbrPerf, { prev: m.prev, year: m.year })}</div>
+      ${perfTable(false, 'actual', pf.segPerf)}
+    </div>
+    <div class="card mt16">
+      <div class="card-title">${str.tblProd}</div>
+      <div class="abbr">${fmt(str.abbrPerf, { prev: m.prev, year: m.year })}</div>
+      ${limitTools('p', ITEM_LIMIT)}
+      ${perfTable(true, 'actual', pf.prodPerf, ITEM_LIMIT)}
+    </div>
+  </div>
+
+  <!-- Section 7 — product performance, backorder-adjusted -->
+  <div class="section">
+    <div class="shead"><div class="snum">7</div><div><h2>${str.s7h}</h2><div class="st">${str.s7st}</div></div></div>
+    <div class="card">
+      <div class="card-title">${str.tblSeg}</div>
+      <div class="abbr">${str.abbrPerfBO}</div>
+      ${perfTable(false, 'bo', pf.segPerf)}
+    </div>
+    <div class="card mt16">
+      <div class="card-title">${str.tblProd}</div>
+      <div class="abbr">${str.abbrPerfBO}</div>
+      ${limitTools('b', ITEM_LIMIT_BO)}
+      ${perfTable(true, 'bo', pf.prodPerf, ITEM_LIMIT_BO)}
+    </div>
   </div>`;
 
   // charts + composition bar (after DOM insert; they read theme CSS vars)
@@ -516,6 +639,10 @@ function render() {
     `<span style="flex:${rp};background:var(--ready);color:var(--on-neutral)">${Math.round(rp)}%</span>` +
     `<span style="flex:${bp};background:var(--bo);color:#fff">${Math.round(bp)}%</span>`;
   wireTips('#chart-trend rect'); wireTips('#chart-cum circle');
+
+  // top-N toggles for the product tables
+  document.querySelectorAll('[data-plimit]').forEach(b => b.onclick = () => { ITEM_LIMIT = b.dataset.plimit === 'all' ? Infinity : Number(b.dataset.plimit); render(); });
+  document.querySelectorAll('[data-blimit]').forEach(b => b.onclick = () => { ITEM_LIMIT_BO = b.dataset.blimit === 'all' ? Infinity : Number(b.dataset.blimit); render(); });
 
   // footer
   $('foot').hidden = false;

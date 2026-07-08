@@ -339,6 +339,16 @@ function wireTips(sel) {
 }
 const monLabels = () => I18N.MONTHS[LANG];
 
+// toggle the left/right edge-fade cues on each scrollable perf table
+function updateScrollShadows() {
+  document.querySelectorAll('.ptable-scroll').forEach(sc => {
+    const w = sc.querySelector('.ptable-wrap'); if (!w) return;
+    const max = w.scrollWidth - w.clientWidth;
+    sc.classList.toggle('more-right', w.scrollLeft < max - 1);
+    sc.classList.toggle('more-left', w.scrollLeft > 1);
+  });
+}
+
 // ---- FLIP re-rank animation for the performance tables ----
 const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 // snapshot each keyed row's viewport position before a re-render
@@ -456,7 +466,7 @@ function perfTable(isProduct, mode, list, limit) {
     return { key, cells: c };
   });
 
-  return `<div class="ptable-wrap"><table class="ptable"><thead><tr>${H.map(h => `<th class="${h.num ? 'num' : ''}"${h.tip ? ` data-tip="${esc(h.tip)}"` : ''}>${esc(h.label)}</th>`).join('')}</tr></thead><tbody>${body.map(row => `<tr data-key="${esc(row.key)}">${row.cells.map(x => `<td class="${x.cls || ''}">${x.html || esc(x.v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  return `<div class="ptable-scroll"><div class="ptable-wrap"><table class="ptable"><thead><tr>${H.map(h => `<th class="${h.num ? 'num' : ''}"${h.tip ? ` data-tip="${esc(h.tip)}"` : ''}>${esc(h.label)}</th>`).join('')}</tr></thead><tbody>${body.map(row => `<tr data-key="${esc(row.key)}">${row.cells.map(x => `<td class="${x.cls || ''}">${x.html || esc(x.v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
 
 // top-N segmented control for the product table
@@ -686,6 +696,10 @@ function render() {
     const prev = captureRowRects(); BO_PROD = next; render(); flipRerank(prev);
   });
   document.querySelectorAll('[data-plimit]').forEach(b => b.onclick = () => { ITEM_LIMIT = b.dataset.plimit === 'all' ? Infinity : Number(b.dataset.plimit); render(); });
+
+  // horizontal-scroll edge cues for the (wide) performance tables
+  document.querySelectorAll('.ptable-wrap').forEach(w => w.addEventListener('scroll', updateScrollShadows, { passive: true }));
+  updateScrollShadows();
 
   // footer
   $('foot').hidden = false;
@@ -960,6 +974,8 @@ function init() {
 
   document.querySelectorAll('#lang-seg .seg-btn').forEach(b => b.addEventListener('click', () => { LANG = b.dataset.lang; localStorage.setItem('mro.lang', LANG); render(); }));
   document.querySelectorAll('#theme-seg .seg-btn').forEach(b => b.addEventListener('click', () => { THEME = b.dataset.themeBtn; localStorage.setItem('mro.theme', THEME); render(); }));
+
+  window.addEventListener('resize', updateScrollShadows);
 
   // shared link? decode and render from the URL; otherwise show the uploader
   if (/^#d=/.test(location.hash)) loadShared(location.hash.slice(3));

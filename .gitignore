@@ -1,0 +1,4 @@
+test_upload.xlsx
+*.tmp
+.DS_Store
+node_modules/

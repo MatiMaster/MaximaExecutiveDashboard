@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MRO International — Executive Dashboard</title>
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ HEADER ============ -->
+  <header>
+    <div class="brand">
+      <div class="mark">MRO</div>
+      <div>
+        <h1 id="t-title">MRO International — Resumen Ejecutivo</h1>
+        <div class="sub" id="t-subtitle">Ventas internacionales y cartera de pedidos · monto neto facturado</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="asof" id="asof-box" hidden>
+        <div class="big" id="asof-big"></div>
+        <div class="mut" id="asof-mut"></div>
+      </div>
+      <div class="toggle-group" role="group" aria-label="Controls">
+        <div class="seg" id="lang-seg">
+          <button class="seg-btn active" data-lang="es" type="button">ES</button>
+          <button class="seg-btn" data-lang="en" type="button">EN</button>
+        </div>
+        <div class="seg" id="theme-seg">
+          <button class="seg-btn active" data-theme-btn="light" type="button" title="Claro / Light">☀</button>
+          <button class="seg-btn" data-theme-btn="dark" type="button" title="Oscuro / Dark">☾</button>
+        </div>
+        <button class="btn-file" id="btn-reupload" type="button" hidden></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ UPLOAD / EMPTY STATE ============ -->
+  <section id="uploader" class="uploader">
+    <div class="drop" id="drop">
+      <input type="file" id="file-input" accept=".xlsx,.xls" hidden />
+      <div class="drop-icon">⬆</div>
+      <h2 id="up-title">Cargar archivo de datos</h2>
+      <p id="up-sub">Arrastra un archivo <b>.xlsx</b> aquí o haz clic para seleccionarlo.</p>
+      <button class="btn-primary" id="btn-browse" type="button">Seleccionar archivo</button>
+      <div class="fmt" id="up-fmt"></div>
+      <div class="err" id="up-err" hidden></div>
+    </div>
+  </section>
+
+  <!-- ============ DASHBOARD (rendered after parse) ============ -->
+  <main id="dashboard" hidden></main>
+
+  <div class="foot" id="foot" hidden></div>
+</div>
+
+<div class="tt" id="tt"></div>
+
+<script src="assets/vendor/xlsx.full.min.js"></script>
+<script src="assets/i18n.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

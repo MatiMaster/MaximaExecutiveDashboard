@@ -26,7 +26,7 @@ const SALES = [SALES_HEAD,
   ['C1', 'Cust A', 'Rep One', 'Invoice', '2025-11-10', 'INV6', 'SKU1', 'memo1', 'Sub', 'CatX', 10, 5, 999, 120, 'EX-ASIA', 'MXWHS', 'Chile', '4T Engine Oils', ''], // full prior year only (Nov > Jul)
   // rows that MUST be excluded by the cleaning rules
   ['C3', 'Cust C', 'Oscar Riquelme', 'Invoice', '2026-04-10', 'INV7', 'SKU1', 'memo1', 'Sub', 'CatZ', 100, 5, 999, 9999, 'EX-EU', 'MXWHS', 'France', '4T Engine Oils', ''], // excluded rep
-  ['CMM02359', 'CMM02359 ACCOUNT', 'Rep One', 'Invoice', '2026-04-11', 'INV8', 'SKU1', 'memo1', 'Sub', 'CatX', 1, 1, 999, 8888, 'EX-ASIA', 'MXWHS', 'Chile', '4T Engine Oils', ''], // excluded account
+  ['C1', 'Cust A', 'Rep One', 'Credit Memo', '2026-04-11', 'CMM02359', 'SKU1', 'SALES CREDIT', 'Sub', 'CatX', 0, 0, 999, -50000, 'EX-ASIA', 'MXWHS', 'Chile', '4T Engine Oils', ''], // excluded credit memo — CMM02359 is in the Document Number column, not ID/Customer
   ['C1', 'Cust A', 'Rep One', 'Invoice', '2026-04-12', 'INV9', 'Subtotal', '', 'Sub', 'CatX', 0, 0, 999, 7777, 'EX-ASIA', 'MXWHS', 'Chile', '', ''] // excluded subtotal line
 ];
 

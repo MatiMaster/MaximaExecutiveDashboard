@@ -158,7 +158,9 @@ function cleanData(wb) {
     country: T(r.country), seg: T(r.seg), sod: toISO(r.sod)
   })).filter(r => {
     if (repKey(r.rep) === 'oscar riquelme') return false;                 // excluded rep
-    if (r.id.includes('CMM02359') || r.c.includes('CMM02359')) return false; // excluded account
+    // excluded credit memo CMM02359 — it can appear in the ID, Customer, OR
+    // Document Number column (CMM = credit memo), so check all three
+    if (r.id.includes('CMM02359') || r.c.includes('CMM02359') || r.doc.includes('CMM02359')) return false;
     if (r.item.toLowerCase() === 'subtotal') return false;                // subtotal lines
     return r.d || r.amt || r.c || r.id;                                   // drop empties
   });

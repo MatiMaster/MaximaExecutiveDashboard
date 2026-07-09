@@ -16,8 +16,15 @@ test('cleaning: Oscar Riquelme / CMM02359 / Subtotal rows are excluded', () => {
   const data = ctx.__app.cleanData(wb);
   assert.equal(data.sales.length, EXPECTED.cleaning.salesRows);
   assert.equal(data.sales.filter(r => /oscar riquelme/i.test(r.rep)).length, 0);
-  assert.equal(data.sales.filter(r => r.id.includes('CMM02359') || r.c.includes('CMM02359')).length, 0);
+  // CMM02359 (a credit memo) must be excluded wherever it appears — including
+  // the Document Number column (regression: a -$50k credit memo leaked into YTD)
+  assert.equal(data.sales.filter(r => r.id.includes('CMM02359') || r.c.includes('CMM02359') || r.doc.includes('CMM02359')).length, 0);
   assert.equal(data.sales.filter(r => r.item.toLowerCase() === 'subtotal').length, 0);
+});
+
+test('cleaning: a CMM02359 credit memo in the Document Number does not drag down YTD', () => {
+  const M = modelFromSheets(ctx, SHEETS);
+  assert.equal(Math.round(M.sales.ytd), EXPECTED.sales.ytd); // the -$50k credit was excluded, not summed in
 });
 
 test('cleaning: uses the Amount column, never Amount (Foreign Currency)', () => {

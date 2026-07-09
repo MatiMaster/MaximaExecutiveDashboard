@@ -53,8 +53,8 @@ function makeCtx(lang = 'es') {
     // capture lexical consts + function declarations from app.js's scope
     + `\n;globalThis.__app = {
          cleanData, computeModel, buildSampleWorkbook, compactModel, hydrateModel,
-         toISO, lyISO, short, full, num, pct1, pct0, fmt, encodeShare, decodeShare,
-         setLang: l => { LANG = l; }, getLang: () => LANG
+         classifyProducts, toISO, lyISO, short, full, num, pct1, pct0, fmt,
+         encodeShare, decodeShare, setLang: l => { LANG = l; }, getLang: () => LANG
        };`;
   vm.runInContext(src, ctx, { filename: 'app-bundle.js' });
   return ctx;

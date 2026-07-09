@@ -60,6 +60,7 @@ package.json            only exists to run the tests (`npm test`)
 - **Bilingual** — Español (default) / English toggle. Numbers/percentages/dates are locale-formatted; segment, warehouse, status, and common country labels translate via `i18n.js` dictionaries (unknown values pass through).
 - **Light (default) / dark** themes.
 - **Shareable links** — the **Share** button embeds the *computed model* (not the raw rows) in the URL hash: compact-encode → gzip (`CompressionStream`) → base64url → `#d=…`. Opening the link decodes and renders with no backend; the hash is never sent to the server, so data stays client-side. ~31 KB for a full real dataset.
+- **Product classification** (Section 7) — buckets the top products into doing-great / OK / slow-declining by growth vs. last year, with count cards and per-bucket lists; has its own backorder toggle.
 - **Sample file** — "Download a sample file" generates a valid `.xlsx` (obfuscated dummy data, realistic magnitudes) in the browser so users see the exact expected format.
 - **Progress bar** on upload — parsing is synchronous and briefly blocks; the bar advances through Reading → Parsing → Computing → Building so the page never looks frozen.
 
@@ -112,6 +113,8 @@ back-fill a missing `Product Segment` from the most common segment per item/memo
 | | By warehouse / customer | grouped Σ `Unit Price × Committed`, **top 5** |
 | 6 Product performance | Per product & per segment | YTD sales, units (Σ `Quantity` YTD), same-period-LY, full-prior-year |
 | | Backorder-adjusted (toggle) | `Adjusted = YTD sales + Σ (Unit Price × Back Ordered)`, re-ranked; per item/segment |
+| 7 Classification | Growth % | `(sales − LY) / LY` per product (LY = same-period last year); `sales` = YTD, or the adjusted total when the section's backorder toggle is on; no prior-year sales ⇒ 0% |
+| | Buckets | over the **top 100 by sales** (segment required): doing-great ≥ +15%, OK strictly between, slow/declining ≤ −15% |
 
 Products are keyed by **item SKU** (shared between `Sales` and `PendingFullFill`);
 the displayed name is that SKU's most common memo/description.
@@ -138,7 +141,7 @@ Requires Node 18+ (uses the built-in test runner, `node:assert`, and the web
 functions (`cleanData`, `computeModel`, formatters, share codec, sample builder)
 — so tests exercise **the exact code the page runs**, not a reimplementation.
 
-### Coverage (35 tests)
+### Coverage (41 tests)
 - **`tests/fixture.js` + `tests/calculations.test.js`** — a tiny hand-crafted
   dataset where **every displayed number is computed by hand** (the arithmetic
   is shown in `EXPECTED`), asserted section by section. This is the anti-
@@ -151,6 +154,9 @@ functions (`cleanData`, `computeModel`, formatters, share codec, sample builder)
   fully attributed across products and segments; ratios equal their definitions;
   ranked lists sorted; series lengths aligned). These catch double-counting,
   dropped rows, and mis-attribution generically.
+- **`tests/classification.test.js`** — the Section 7 buckets (±15% thresholds
+  incl. boundaries, no-prior-year ⇒ OK, segment/activity exclusions, sales-desc
+  ranking, and the backorder toggle moving a product between buckets).
 - **`tests/formatting.test.js`** — the locale formatters in ES and EN (grouping,
   decimals, M/K abbreviation, signs, percentages) — what the executive reads.
 - **`tests/sharelink.test.js`** — the share codec round-trips the model

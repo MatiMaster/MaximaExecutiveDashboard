@@ -100,6 +100,13 @@
       tipPFY: '% AC — variación porcentual frente al año completo {prev}',
       showN: 'Mostrar', showAll: 'Todos', noItems: 'Sin productos para el período seleccionado.',
 
+      s7h: 'Clasificación de productos',
+      s7st: 'Cómo evoluciona cada producto frente al mismo período del año anterior',
+      classNote: 'Top {n} productos por ventas · clasificados según ventas del período vs. mismo período {prev}. Se excluyen productos sin segmento.',
+      classAnalyzed: 'Productos analizados', classGood: 'Van muy bien', classOk: 'Van estables', classSlow: 'Lentos / con baja',
+      tblGood: '¿Qué productos van muy bien?', tblOk: '¿Qué productos van estables?', tblSlow: '¿Qué productos van lentos?',
+      classEmpty: 'Ninguno',
+
       foot: 'Panel ejecutivo · Fuente: <b>{source}</b> · datos al {date}. La cartera de pedidos se descompone en <b>pedido = por despachar (comprometido) + en backorder + ya despachado</b>. Todos los valores se calculan a partir del archivo cargado.'
     },
     en: {
@@ -192,6 +199,13 @@
       tipDFY: 'Δ FY — difference vs. full year {prev}',
       tipPFY: '% FY — percentage change vs. full year {prev}',
       showN: 'Show', showAll: 'All', noItems: 'No products for the selected period.',
+
+      s7h: 'Product classification',
+      s7st: 'How each product is trending versus the same period last year',
+      classNote: 'Top {n} products by sales · classified by period sales vs. the same period in {prev}. Products without a segment are excluded.',
+      classAnalyzed: 'Products analyzed', classGood: 'Doing great', classOk: 'Doing OK', classSlow: 'Slow / declining',
+      tblGood: 'Products doing great', tblOk: 'Products doing OK', tblSlow: 'Products slow / declining',
+      classEmpty: 'None',
 
       foot: 'Executive panel · Source: <b>{source}</b> · data as of {date}. The order backlog breaks down as <b>ordered = to ship (committed) + on backorder + already shipped</b>. All values are computed from the uploaded file.'
     }

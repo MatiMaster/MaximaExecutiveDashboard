@@ -16,6 +16,7 @@ let SOURCE = '';       // uploaded file name
 let ITEM_LIMIT = 25;   // top-N for the product performance table
 let BO_SEG = false;    // segment table: false = actual · true = backorder-adjusted
 let BO_PROD = false;   // product table: false = actual · true = backorder-adjusted
+let BO_CLASS = false;  // classification section: false = actual · true = backorder-adjusted
 
 const $ = id => document.getElementById(id);
 const S = () => I18N.STR[LANG];
@@ -479,9 +480,51 @@ function limitTools(cur) {
     }).join('') + `</div></div>`;
 }
 
+// Classify products by growth vs. the same period last year, over the top-100
+// by sales. Products without a segment or with no activity are excluded.
+// `adjusted` uses the backorder-adjusted total (YTD + backorder) as sales.
+// Buckets: doing great (>= +15%), OK (between), slow/declining (<= -15%).
+// No prior-year sales -> growth is undefined -> treated as 0% (OK).
+function classifyProducts(prodPerf, adjusted) {
+  const GOOD = 0.15, SLOW = -0.15;
+  const rows = prodPerf
+    .filter(p => p.seg)
+    .map(p => {
+      const sales = adjusted ? p.ytd + p.bo : p.ytd;
+      const pct = p.ly > 0 ? (sales - p.ly) / p.ly : 0;
+      return { item: p.item, name: p.name, seg: p.seg, sales, ly: p.ly, units: p.units, pct };
+    })
+    .filter(r => r.sales > 0 || r.ly > 0)
+    .sort((a, b) => b.sales - a.sales)
+    .slice(0, 100);
+  rows.forEach((r, i) => { r.rank = i + 1; });
+  return {
+    analyzed: rows.length,
+    good: rows.filter(r => r.pct >= GOOD),
+    ok: rows.filter(r => r.pct > SLOW && r.pct < GOOD),
+    slow: rows.filter(r => r.pct <= SLOW)
+  };
+}
+
+// compact classification table: # · product · % vs LY · sales
+function classTable(rows) {
+  const str = S(), prev = MODEL.prev;
+  if (!rows.length) return `<div class="note">${str.classEmpty}</div>`;
+  const H = [{ label: '#', num: true }, { label: str.colProduct },
+             { label: fmt(str.colSP, { prev }), num: true, tip: fmt(str.tipPSP, { prev }) },
+             { label: str.colYTD, num: true }];
+  const body = rows.slice(0, 15).map(r => [
+    { v: r.rank, cls: 'rank' },
+    { html: `<span class="pn1"><b>${esc(r.item)}</b> ${esc(r.name)}</span>`, cls: 'name1' },
+    { v: (r.pct > 0 ? '+' : '') + pct1(r.pct), cls: 'num ' + dCls(r.pct) },
+    { v: full(r.sales), cls: 'num' }
+  ]);
+  return `<div class="ptable-scroll"><div class="ptable-wrap"><table class="ptable compact"><thead><tr>${H.map(h => `<th class="${h.num ? 'num' : ''}"${h.tip ? ` data-tip="${esc(h.tip)}"` : ''}>${esc(h.label)}</th>`).join('')}</tr></thead><tbody>${body.map(cs => `<tr>${cs.map(x => `<td class="${x.cls || ''}">${x.html || esc(x.v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+}
+
 // per-table view toggle: actual sales vs. backorder-adjusted (what-if-fulfilled)
 function viewTools(kind) {
-  const str = S(), on = kind === 'seg' ? BO_SEG : BO_PROD, attr = 'data-bo' + kind;
+  const str = S(), on = { seg: BO_SEG, prod: BO_PROD, class: BO_CLASS }[kind], attr = 'data-bo' + kind;
   return `<div class="table-tools perf-view"><span class="lbl">${str.perfView}</span><div class="seg">` +
     `<button class="seg-btn ${!on ? 'active' : ''}" ${attr}="0">${str.perfActual}</button>` +
     `<button class="seg-btn ${on ? 'active' : ''}" ${attr}="1">${str.perfBO}</button>` +
@@ -548,6 +591,7 @@ function render() {
   const abbrActual = fmt(str.abbrPerf, { prev: m.prev, year: m.year });
   const segAbbr = BO_SEG ? str.abbrPerfBO : abbrActual;
   const prodAbbr = BO_PROD ? str.abbrPerfBO : abbrActual;
+  const cls = classifyProducts(pf.prodPerf, BO_CLASS); // product classification (Section 7)
 
   $('dashboard').hidden = false;
   $('dashboard').innerHTML = `
@@ -675,6 +719,24 @@ function render() {
       <div class="abbr">${prodAbbr}</div>
       ${perfTable(true, prodMode, pf.prodPerf, ITEM_LIMIT)}
     </div>
+  </div>
+
+  <!-- Section 7 — product classification (great / OK / slow), backorder-toggleable -->
+  <div class="section">
+    <div class="shead"><div class="snum">7</div><div><h2>${str.s7h}</h2><div class="st">${str.s7st}</div></div></div>
+    <div class="perf-ctrls">${viewTools('class')}</div>
+    <div class="abbr">${fmt(str.classNote, { n: cls.analyzed, prev: m.prev })}</div>
+    <div class="row r-4">
+      <div class="card metric"><div class="label">${str.classAnalyzed}</div><div class="value">${num(cls.analyzed)}</div></div>
+      <div class="card metric"><div class="label">${str.classGood}</div><div class="value good-text">${num(cls.good.length)}</div></div>
+      <div class="card metric"><div class="label">${str.classOk}</div><div class="value">${num(cls.ok.length)}</div></div>
+      <div class="card metric"><div class="label">${str.classSlow}</div><div class="value bad-text">${num(cls.slow.length)}</div></div>
+    </div>
+    <div class="row r-3 mt16">
+      <div class="card"><div class="card-title">${str.tblGood} <span class="count-badge">${cls.good.length}</span></div>${classTable(cls.good)}</div>
+      <div class="card"><div class="card-title">${str.tblOk} <span class="count-badge">${cls.ok.length}</span></div>${classTable(cls.ok)}</div>
+      <div class="card"><div class="card-title">${str.tblSlow} <span class="count-badge">${cls.slow.length}</span></div>${classTable(cls.slow)}</div>
+    </div>
   </div>`;
 
   // charts + composition bar (after DOM insert; they read theme CSS vars)
@@ -694,6 +756,10 @@ function render() {
   document.querySelectorAll('[data-boprod]').forEach(b => b.onclick = () => {
     const next = b.dataset.boprod === '1'; if (next === BO_PROD) return;
     const prev = captureRowRects(); BO_PROD = next; render(); flipRerank(prev);
+  });
+  document.querySelectorAll('[data-boclass]').forEach(b => b.onclick = () => {
+    const next = b.dataset.boclass === '1'; if (next === BO_CLASS) return;
+    BO_CLASS = next; render();
   });
   document.querySelectorAll('[data-plimit]').forEach(b => b.onclick = () => { ITEM_LIMIT = b.dataset.plimit === 'all' ? Infinity : Number(b.dataset.plimit); render(); });
 

@@ -515,11 +515,11 @@ function classTable(rows) {
              { label: str.colYTD, num: true }];
   const body = rows.slice(0, 15).map(r => [
     { v: r.rank, cls: 'rank' },
-    { html: `<span class="pn1"><b>${esc(r.item)}</b> ${esc(r.name)}</span>`, cls: 'name1' },
+    { html: `<span class="pn1"><b>${esc(r.item)}</b> ${esc(r.name)}</span>`, cls: 'name1', tip: r.item + ' · ' + r.name },
     { v: (r.pct > 0 ? '+' : '') + pct1(r.pct), cls: 'num ' + dCls(r.pct) },
     { v: full(r.sales), cls: 'num' }
   ]);
-  return `<div class="ptable-scroll"><div class="ptable-wrap"><table class="ptable compact"><thead><tr>${H.map(h => `<th class="${h.num ? 'num' : ''}"${h.tip ? ` data-tip="${esc(h.tip)}"` : ''}>${esc(h.label)}</th>`).join('')}</tr></thead><tbody>${body.map(cs => `<tr>${cs.map(x => `<td class="${x.cls || ''}">${x.html || esc(x.v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+  return `<div class="ptable-scroll"><div class="ptable-wrap"><table class="ptable compact"><thead><tr>${H.map(h => `<th class="${h.num ? 'num' : ''}"${h.tip ? ` data-tip="${esc(h.tip)}"` : ''}>${esc(h.label)}</th>`).join('')}</tr></thead><tbody>${body.map(cs => `<tr>${cs.map(x => `<td class="${x.cls || ''}"${x.tip ? ` data-tip="${esc(x.tip)}"` : ''}>${x.html || esc(x.v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
 
 // per-table view toggle: actual sales vs. backorder-adjusted (what-if-fulfilled)
@@ -746,7 +746,8 @@ function render() {
   $('comp').innerHTML =
     `<span style="flex:${rp};background:var(--ready);color:var(--on-neutral)">${Math.round(rp)}%</span>` +
     `<span style="flex:${bp};background:var(--bo);color:#fff">${Math.round(bp)}%</span>`;
-  wireTips('#chart-trend rect'); wireTips('#chart-cum circle'); wireTips('.ptable th[data-tip]');
+  wireTips('#chart-trend rect'); wireTips('#chart-cum circle');
+  wireTips('.ptable th[data-tip]'); wireTips('.ptable td[data-tip]');
 
   // per-table view toggles (animated re-rank) + product top-N
   document.querySelectorAll('[data-boseg]').forEach(b => b.onclick = () => {

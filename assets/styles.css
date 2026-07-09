@@ -199,7 +199,7 @@ h1{font-size:21px;margin:0;letter-spacing:-.02em;font-weight:750}
 .ptable td.good{color:var(--good);font-weight:650}
 .ptable td.bad{color:var(--bad);font-weight:650}
 .ptable td.name{max-width:190px;white-space:normal}
-.ptable td.name1{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ptable td.name1{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help}
 .ptable td.name1 .pn1 b{color:var(--ink)} .ptable td.name1 .pn1{color:var(--muted)}
 .ptable td.name b{color:var(--ink)} .ptable td.name span{color:var(--muted);display:block;font-size:11px}
 .ptable td.strong{font-weight:750;color:var(--ink)}

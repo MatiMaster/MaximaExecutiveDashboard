@@ -83,6 +83,15 @@ const EXPECTED = {
     boSOs: 2,             // distinct docs with a backorder: SO1, SO3
     readyShare: 850 / 1300,
     status: [['Pending Fulfillment', 2], ['Partially Fulfilled', 1]],
+    // fulfillment funnel: the one IF is Created from SO1, so SO1 is "IF In Progress"
+    // and SO2/SO3 are "Waiting IF". avgDays = days from row date to as-of 2026-07-01:
+    // 2026-05-01->61, 05-02->60, 05-03->59, 05-04->58, IF 06-01->30
+    funnel: {
+      open:    { qty: 3, amount: 1300, avgDays: (61 + 60 + 59 + 58) / 4 }, // 59.5, all 4 PFF rows / 3 docs
+      waiting: { qty: 2, amount: 700, avgDays: (60 + 58) / 2 },            // 59, SO2+SO3
+      inProg:  { ifQty: 1, soQty: 1, amount: 600, avgDays: 30 },           // SO1 (rows 1+3), the one IF (06-01)
+      bo:      { units: 58, amount: 450, sos: 2, avgDays: (61 + 59 + 58) / 3, pctOfOpen: 450 / 1300 }
+    },
     boWh: [['MXWHS', 400], ['VTNWH-MX', 50]],
     boCust: [['Cust A', 250], ['Cust D', 200]],
     readyWh: [['EU Warehouse', 500], ['MXWHS', 300], ['VTNWH-MX', 50]],

@@ -29,6 +29,7 @@ const locale = () => LANG === 'es' ? 'es-CL' : 'en-US';
 const full = n => { n = Math.round(Number(n) || 0); return (n < 0 ? '-' : '') + '$' + Math.abs(n).toLocaleString(locale()); };
 const signed = n => (Number(n) > 0 ? '+' : '') + full(n);
 const num = n => Math.round(Number(n) || 0).toLocaleString(locale());
+const num1 = n => { let s = (Number(n) || 0).toFixed(1); if (LANG === 'es') s = s.replace('.', ','); return s; };
 function short(n) {
   n = Number(n) || 0; const a = Math.abs(n);
   if (a >= 1e6) { let s = (a / 1e6).toFixed(2); if (LANG === 'es') s = s.replace('.', ','); return (n < 0 ? '-' : '') + '$' + s + 'M'; }
@@ -271,6 +272,24 @@ function computeModel(data) {
   for (const st of statusOfDoc.values()) statusCount.set(st, (statusCount.get(st) || 0) + 1);
   const status = [...statusCount.entries()].sort((a, b) => b[1] - a[1]);
 
+  // ---- fulfillment funnel: split the open book by whether an Item Fulfillment (IF)
+  // has been created from the SO. The IF sheet's "Created" column carries the source
+  // SO document, so a pending SO is "IF In Progress" when an IF references it, and
+  // "Waiting IF" otherwise. Avg days = days from the row date to the as-of date.
+  const daysSince = d => { if (!d) return 0; const ms = Date.parse(asOf + 'T00:00:00') - Date.parse(d + 'T00:00:00'); return ms > 0 ? Math.round(ms / 86400000) : 0; };
+  const avgDays = rows => rows.length ? rows.reduce((a, r) => a + daysSince(r.d), 0) / rows.length : 0;
+  const ifSOSet = new Set(ifs.map(r => r.created).filter(Boolean));    // SOs that have an IF
+  const pffDocSet = new Set(pff.map(r => r.doc).filter(Boolean));      // still-pending SOs
+  const waitingRows = pff.filter(r => !ifSOSet.has(r.doc));            // pending, no IF yet
+  const inProgRows = pff.filter(r => ifSOSet.has(r.doc));              // pending, IF started
+  const ifInProg = ifs.filter(r => pffDocSet.has(r.created));         // IFs whose SO is still pending
+  const funnel = {
+    open:    { qty: openOrders, amount: openValue, avgDays: avgDays(pff) },
+    waiting: { qty: new Set(waitingRows.map(r => r.doc).filter(Boolean)).size, amount: waitingRows.reduce((a, r) => a + r.agg, 0), avgDays: avgDays(waitingRows) },
+    inProg:  { ifQty: new Set(ifInProg.map(r => r.doc).filter(Boolean)).size, soQty: new Set(inProgRows.map(r => r.doc).filter(Boolean)).size, amount: inProgRows.reduce((a, r) => a + r.agg, 0), avgDays: avgDays(ifInProg) },
+    bo:      { units: boUnits, amount: boValue, sos: boSOs, avgDays: avgDays(boRows), pctOfOpen: openValue ? boValue / openValue : 0 }
+  };
+
   // ---- product / segment performance (YTD vs same-period-LY vs full prior year) ----
   const fyFrom = prev + '-01-01', fyTo = prev + '-12-31';
   const topLabel = (counts) => { let best = '', n = -1; for (const [k, c] of counts) if (c > n) { n = c; best = k; } return best; };
@@ -317,7 +336,7 @@ function computeModel(data) {
     markets: { topCountries, topSegments, topCountriesShare, topSegShare },
     book: {
       openValue, openOrders, bookCustomers, readyValue, readyUnits, orderedUnits,
-      boValue, boUnits, boSOs, status,
+      boValue, boUnits, boSOs, status, funnel,
       boWh: topBy(boRows, r => r.loc, r => r.up * r.bo, 5),
       boCust: topBy(boRows, r => r.c, r => r.up * r.bo, 5),
       readyWh: topBy(pff, r => r.loc, r => r.up * r.com, 5),
@@ -554,7 +573,7 @@ function render() {
 
   if (!MODEL) { renderEmpty(); return; }
 
-  const m = MODEL, sd = m.sales, bk = m.book, mk = m.markets, pf = m.perf;
+  const m = MODEL, sd = m.sales, bk = m.book, mk = m.markets, pf = m.perf, fn = bk.funnel;
 
   // as-of box
   $('asof-box').hidden = false;
@@ -671,6 +690,45 @@ function render() {
             <span class="k"><span class="sw" style="display:inline-block;width:11px;height:11px;border-radius:3px;background:var(--bo);margin-right:7px;vertical-align:-1px"></span>${str.s3bo} <b>${short(bk.boValue)}</b></span>
           </div>
           <div class="status-pills">${chips}</div>
+        </div>
+      </div>
+    </div>
+    <div class="funnel mt16">
+      <div class="label">${str.funnelTitle}</div>
+      <div class="note" style="margin:2px 0 14px">${str.funnelNote}</div>
+      <div class="row r-4 funnel-cards">
+        <div class="card metric fcard">
+          <div class="fhead" title="${esc(str.fOpenTip)}">${str.fOpen}</div>
+          <div class="fmetrics">
+            <div><div class="label" title="${esc(str.fQtyTip)}">${str.fQty}</div><div class="value">${num(fn.open.qty)}</div></div>
+            <div><div class="label">${str.fAmount}</div><div class="value">${short(fn.open.amount)}</div></div>
+            <div><div class="label" title="${esc(str.fAvgDaysTip)}">${str.fAvgDays}</div><div class="value">${num1(fn.open.avgDays)}</div></div>
+          </div>
+        </div>
+        <div class="card metric fcard">
+          <div class="fhead" title="${esc(str.fWaitingTip)}">${str.fWaiting}</div>
+          <div class="fmetrics">
+            <div><div class="label" title="${esc(str.fQtyTip)}">${str.fQty}</div><div class="value">${num(fn.waiting.qty)}</div></div>
+            <div><div class="label">${str.fAmount}</div><div class="value">${short(fn.waiting.amount)}</div></div>
+            <div><div class="label" title="${esc(str.fAvgDaysTip)}">${str.fAvgDays}</div><div class="value">${num1(fn.waiting.avgDays)}</div></div>
+          </div>
+        </div>
+        <div class="card metric fcard">
+          <div class="fhead" title="${esc(str.fInProgTip)}">${str.fInProg}</div>
+          <div class="fmetrics">
+            <div><div class="label" title="${esc(str.fIfQtyTip)}">${str.fIfQty}</div><div class="value">${num(fn.inProg.ifQty)}</div></div>
+            <div><div class="label" title="${esc(str.fSoQtyTip)}">${str.fSoQty}</div><div class="value">${num(fn.inProg.soQty)}</div></div>
+            <div><div class="label">${str.fAmount}</div><div class="value">${short(fn.inProg.amount)}</div></div>
+            <div><div class="label" title="${esc(str.fAvgDaysTip)}">${str.fAvgDays}</div><div class="value">${num1(fn.inProg.avgDays)}</div></div>
+          </div>
+        </div>
+        <div class="card metric fcard fcard-bo">
+          <div class="fhead" title="${esc(str.fBoTip)}">${str.fBo}</div>
+          <div class="fmetrics">
+            <div><div class="label">${str.fUnits}</div><div class="value bad-text">${num(fn.bo.units)}</div></div>
+            <div><div class="label">${str.fAmount}</div><div class="value bad-text">${short(fn.bo.amount)}</div><div class="fsub">${pct0(fn.bo.pctOfOpen)} ${str.fPctOpen}</div></div>
+            <div><div class="label">${str.fAvgDays}</div><div class="value bad-text">${num1(fn.bo.avgDays)}</div><div class="fsub">${str.fBoAvgNote}</div></div>
+          </div>
         </div>
       </div>
     </div>

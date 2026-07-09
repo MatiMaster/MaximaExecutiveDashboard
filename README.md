@@ -107,6 +107,9 @@ back-fill a missing `Product Segment` from the most common segment per item/memo
 | | Committed (ready) value / units | Σ `Unit Price × Committed` / Σ `Committed` |
 | | Backorder value | Σ `Unit Price × Back Ordered` where `Back Ordered > 0` |
 | | Status chips | distinct SO count per `Validated Status`; plus Σ `Ordered` |
+| 3 Funnel | Open SO | qty = distinct pending `Document Number`; amount = Σ `Aggregate Amount`; avg days = mean (as-of − row date) |
+| | Waiting IF / IF In Progress | split each pending SO by whether the **IF sheet** has a row whose `Created` = that SO. Waiting = no IF; In Progress = has IF. `IF Qty` = distinct IF docs whose source SO is still pending; `SO Qty` = distinct pending SOs with an IF; amount = Σ `Aggregate Amount` of those SOs; avg days over IF dates. Open SO amount = Waiting + In Progress (a partition) |
+| | BO | units = Σ `Back Ordered`; amount = Σ `Unit Price × Back Ordered`; % of open value; avg days over backordered lines |
 | 4 Backorders | Value / units / SOs | as above; units = Σ `Back Ordered`; SOs = distinct docs with a backorder |
 | | By warehouse / customer | grouped Σ `Unit Price × Back Ordered`, **top 5** |
 | 5 Awaiting fulfillment | Ready value / units / % | committed value/units; % = ready ÷ open value |
@@ -141,7 +144,7 @@ Requires Node 18+ (uses the built-in test runner, `node:assert`, and the web
 functions (`cleanData`, `computeModel`, formatters, share codec, sample builder)
 — so tests exercise **the exact code the page runs**, not a reimplementation.
 
-### Coverage (41 tests)
+### Coverage (48 tests)
 - **`tests/fixture.js` + `tests/calculations.test.js`** — a tiny hand-crafted
   dataset where **every displayed number is computed by hand** (the arithmetic
   is shown in `EXPECTED`), asserted section by section. This is the anti-
@@ -154,6 +157,10 @@ functions (`cleanData`, `computeModel`, formatters, share codec, sample builder)
   fully attributed across products and segments; ratios equal their definitions;
   ranked lists sorted; series lengths aligned). These catch double-counting,
   dropped rows, and mis-attribution generically.
+- **`tests/funnel.test.js`** — the Section 3 fulfillment funnel: the PFF↔IF join
+  by the IF's `Created` (source SO), each card (Open SO / Waiting IF / IF In
+  Progress / BO), avg-days over the right date set, and the Open = Waiting +
+  In-Progress partition.
 - **`tests/classification.test.js`** — the Section 7 buckets (±15% thresholds
   incl. boundaries, no-prior-year ⇒ OK, segment/activity exclusions, sales-desc
   ranking, and the backorder toggle moving a product between buckets).

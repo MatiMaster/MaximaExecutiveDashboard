@@ -141,6 +141,18 @@ h1{font-size:21px;margin:0;letter-spacing:-.02em;font-weight:750}
 .subgrid{display:flex;gap:26px;flex-wrap:wrap;margin-top:4px}
 .subgrid .label{margin-bottom:4px}
 
+/* ---------- fulfillment funnel (Section 3) ---------- */
+.funnel-cards{gap:12px}
+.fcard{padding:14px 16px}
+.fcard .fhead{font-size:13px;font-weight:750;letter-spacing:-.01em;color:var(--ink);
+  padding-bottom:9px;margin-bottom:11px;border-bottom:1px solid var(--border);cursor:help}
+.fcard-bo .fhead{color:var(--bo)}
+.fmetrics{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.fmetrics .label{margin-bottom:3px;cursor:help;display:inline-block}
+.fmetrics .value{font-size:21px;margin:0;font-variant-numeric:tabular-nums}
+.fsub{color:var(--muted);font-size:10.5px;margin-top:2px;line-height:1.3}
+@media (max-width:1000px){ .funnel-cards.r-4{grid-template-columns:1fr 1fr} }
+
 /* ---------- legend ---------- */
 .legend{display:flex;gap:20px;font-size:12.5px;color:var(--ink2);margin:2px 0 10px;flex-wrap:wrap}
 .legend .sw{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:7px;vertical-align:-1px}

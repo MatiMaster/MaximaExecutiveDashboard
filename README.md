@@ -57,6 +57,7 @@ package.json            only exists to run the tests (`npm test`)
 
 ### Features
 - **Upload-driven, deterministic** — every figure is computed from the file; nothing stored.
+- **Filters** (live upload only) — a filter bar slices the whole dashboard: Sales Rep, Client Category (International/Domestic, derived from the rep), Subsidiary, Location/warehouse, Customer, Customer Type, Customer Category, Country, Product Segment (multi-select each), a Document-number exact match, and a Date From/To range. Filtering re-derives the model from the cleaned data via `filterData()` → `computeModel(fd, {asOf, from, to})`, so **every** section (sales KPIs, markets, order book, funnel, backorders, product/segment performance, classification) moves together. Defaults are empty ⇒ identical to the full dataset. The as-of anchor is pinned to the full-data max Sales date so filtering never shifts the period; the date range, when set, redefines the current period and shifts the same-period-LY window with it, and also clips the open book by SO date. Filters live on the raw rows, so they are **not** available on shared links / snapshots (which carry only the computed model — the bar hides itself there).
 - **Bilingual** — Español (default) / English toggle. Numbers/percentages/dates are locale-formatted; segment, warehouse, status, and common country labels translate via `i18n.js` dictionaries (unknown values pass through).
 - **Light (default) / dark** themes.
 - **Shareable links** — the **Share** button embeds the *computed model* (not the raw rows) in the URL hash: compact-encode → gzip (`CompressionStream`) → base64url → `#d=…`. Opening the link decodes and renders with no backend; the hash is never sent to the server, so data stays client-side. ~31 KB for a full real dataset.
@@ -144,7 +145,7 @@ Requires Node 18+ (uses the built-in test runner, `node:assert`, and the web
 functions (`cleanData`, `computeModel`, formatters, share codec, sample builder)
 — so tests exercise **the exact code the page runs**, not a reimplementation.
 
-### Coverage (48 tests)
+### Coverage (62 tests)
 - **`tests/fixture.js` + `tests/calculations.test.js`** — a tiny hand-crafted
   dataset where **every displayed number is computed by hand** (the arithmetic
   is shown in `EXPECTED`), asserted section by section. This is the anti-
@@ -157,6 +158,10 @@ functions (`cleanData`, `computeModel`, formatters, share codec, sample builder)
   fully attributed across products and segments; ratios equal their definitions;
   ranked lists sorted; series lengths aligned). These catch double-counting,
   dropped rows, and mis-attribution generically.
+- **`tests/filters.test.js`** — every filter dimension narrows the model correctly
+  (sales KPIs, order book, and funnel all respond), client-category-from-rep,
+  the date range redefining the period + shifting LY + clipping the book, filters
+  composing, `filterOptions` menus, and "no filters ⇒ full-data model exactly".
 - **`tests/funnel.test.js`** — the Section 3 fulfillment funnel: the PFF↔IF join
   by the IF's `Created` (source SO), each card (Open SO / Waiting IF / IF In
   Progress / BO), avg-days over the right date set, and the Open = Waiting +

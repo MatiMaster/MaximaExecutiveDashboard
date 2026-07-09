@@ -17,6 +17,10 @@ let ITEM_LIMIT = 25;   // top-N for the product performance table
 let BO_SEG = false;    // segment table: false = actual · true = backorder-adjusted
 let BO_PROD = false;   // product table: false = actual · true = backorder-adjusted
 let BO_CLASS = false;  // classification section: false = actual · true = backorder-adjusted
+let DATA = null;       // cleaned data (live upload only) — the source for re-filtering
+let ASOF = '';         // stable period anchor = max Sales date over the full dataset
+let OPTIONS = null;    // distinct filter-menu values, computed once per upload
+let FILTERS = null;    // current filter selection
 
 const $ = id => document.getElementById(id);
 const S = () => I18N.STR[LANG];
@@ -203,6 +207,71 @@ function cleanData(wb) {
   return { sales, pff, target, ifs };
 }
 
+/* ------------------------------------------------------------------ *
+ * 3b. Filters — narrow the cleaned data before computeModel so EVERY
+ * section reflects the selection. Mirrors the original dashboard's
+ * dimensions. Defaults are all-empty, i.e. no filtering (the numbers
+ * match the full dataset until the user picks something).
+ * ------------------------------------------------------------------ */
+// The "Client Category" dimension is derived from the sales rep.
+const INTERNATIONAL_REPS = new Set(['benjamin gonzalez', 'patrik erlandsson', 'jean charles', 'cristian calderon', 'oscar riquelme', 'hugo rodriguez', 'jean charles robert', 'andres orozco']);
+const clientCat = rep => INTERNATIONAL_REPS.has(repKey(rep)) ? 'International' : 'Domestic';
+
+const emptyFilters = () => ({ rep: [], clientCat: [], sub: [], loc: [], customer: [], ctype: [], custCat: [], country: [], seg: [], from: '', to: '', doc: '' });
+
+// a multi-select matches when nothing is selected, else the value is in the set
+const mMatch = (arr, v) => !arr || arr.length === 0 || arr.map(String).includes(String(v == null ? '' : v).trim());
+// segment can be a pipe-joined multi-value; match if ANY part is selected
+const segMatch = (arr, v) => { if (!arr || arr.length === 0) return true; const vals = String(v == null ? '' : v).split('|').map(x => x.trim()).filter(Boolean); return vals.some(x => arr.map(String).includes(x)); };
+const dRange = (d, from, to) => (!from && !to) ? true : (d ? (!from || d >= from) && (!to || d <= to) : false);
+
+function filterData(data, F) {
+  F = F || emptyFilters();
+  // customer -> category, learned from Sales (PFF/IF rows carry no category)
+  const catByCust = new Map();
+  data.sales.forEach(r => { if (r.c && r.cat && !catByCust.has(r.c)) catByCust.set(r.c, r.cat); });
+  const dateOn = !!(F.from || F.to);
+
+  const sales = data.sales.filter(r =>
+    mMatch(F.rep, r.rep) && mMatch(F.clientCat, clientCat(r.rep)) && mMatch(F.sub, r.sub) &&
+    mMatch(F.loc, r.loc) && mMatch(F.customer, r.c) && mMatch(F.ctype, r.ctype) &&
+    mMatch(F.custCat, r.cat) && mMatch(F.country, r.country) && segMatch(F.seg, r.seg) &&
+    (!F.doc || r.doc === F.doc));
+  // NOTE: the date range does NOT clip sales here — computeModel needs prior-year
+  // rows for the same-period-LY / full-year comparisons. It applies the period
+  // window internally instead (see opts.from / opts.to).
+
+  const pff = data.pff.filter(r =>
+    mMatch(F.rep, r.rep) && mMatch(F.clientCat, clientCat(r.rep)) && mMatch(F.sub, r.sub) &&
+    mMatch(F.loc, r.loc) && mMatch(F.customer, r.c) && mMatch(F.custCat, catByCust.get(r.c) || '') &&
+    segMatch(F.seg, r.seg) && (!F.doc || r.doc === F.doc) &&
+    (!dateOn || dRange(r.d, F.from, F.to)));
+
+  const ifs = data.ifs.filter(r =>
+    mMatch(F.rep, r.rep) && mMatch(F.clientCat, clientCat(r.rep)) && mMatch(F.sub, r.sub) &&
+    mMatch(F.loc, r.loc) && mMatch(F.customer, r.name) && mMatch(F.custCat, catByCust.get(r.name) || '') &&
+    mMatch(F.country, r.country) && (!F.doc || r.doc === F.doc || r.created === F.doc) &&
+    (!dateOn || dRange(r.d, F.from, F.to)));
+
+  return { sales, pff, target: data.target, ifs };
+}
+
+// distinct sorted values across the cleaned data, for populating filter menus
+function filterOptions(data) {
+  const uniq = arr => [...new Set(arr.filter(v => v != null && String(v).trim() !== ''))].sort((a, b) => String(a).localeCompare(String(b)));
+  return {
+    rep: uniq([...data.sales.map(r => r.rep), ...data.pff.map(r => r.rep), ...data.ifs.map(r => r.rep)]),
+    clientCat: ['Domestic', 'International'],
+    sub: uniq([...data.sales.map(r => r.sub), ...data.pff.map(r => r.sub), ...data.ifs.map(r => r.sub)]),
+    loc: uniq([...data.sales.map(r => r.loc), ...data.pff.map(r => r.loc), ...data.ifs.map(r => r.loc)]),
+    customer: uniq([...data.sales.map(r => r.c), ...data.pff.map(r => r.c), ...data.ifs.map(r => r.name)]),
+    ctype: uniq(data.sales.map(r => r.ctype)),
+    custCat: uniq(data.sales.map(r => r.cat)),
+    country: uniq([...data.sales.map(r => r.country), ...data.ifs.map(r => r.country)]),
+    seg: uniq([...data.sales.map(r => r.seg), ...data.pff.map(r => r.seg)])
+  };
+}
+
 // grouped sum helper: rows -> [[label, value], ...] sorted desc, top n
 function topBy(rows, keyFn, valFn, n) {
   const m = new Map();
@@ -211,15 +280,20 @@ function topBy(rows, keyFn, valFn, n) {
   return n ? arr.slice(0, n) : arr;
 }
 
-function computeModel(data) {
+function computeModel(data, opts) {
   const { sales, pff, target, ifs } = data;
+  opts = opts || {};
 
-  // as-of date = latest sales date in the file; year = its year
-  const asOf = sales.reduce((mx, r) => r.d > mx ? r.d : mx, '');
+  // Period. Default = [year-start, as-of], where as-of is the latest Sales date
+  // (opts.asOf lets a caller pin a stable anchor so filtering doesn't move it).
+  // A date filter (opts.from / opts.to) overrides the period; LY/FY shift with it.
+  const dataAsOf = sales.reduce((mx, r) => r.d > mx ? r.d : mx, '');
+  const asOf = opts.to || opts.asOf || dataAsOf;   // period end (as-of, or the filter's To)
   const year = Number(asOf.slice(0, 4));
   const prev = year - 1;
   const yearStart = year + '-01-01';
-  const ytdFrom = yearStart, ytdTo = asOf;
+  const periodStart = opts.from || yearStart;      // period start (year-start, or the filter's From)
+  const ytdFrom = periodStart, ytdTo = asOf;
   const lyFrom = lyISO(ytdFrom), lyTo = lyISO(ytdTo);
 
   const inR = (d, a, b) => d && d >= a && d <= b;
@@ -232,18 +306,20 @@ function computeModel(data) {
   const activeCustomers = new Set(selYTD.map(r => r.c).filter(Boolean)).size;
   const countries = new Set(selYTD.map(r => r.country).filter(Boolean)).size;
 
-  // ---- monthly bars: complete months only (partial current month excluded) ----
+  // ---- monthly bars: complete months within the period only ----
   const asOfMonth = Number(asOf.slice(5, 7)), asOfDay = Number(asOf.slice(8, 10));
   const lastDayOfMonth = new Date(year, asOfMonth, 0).getDate();
   const monthComplete = asOfDay >= lastDayOfMonth;
   const lastFullMonth = monthComplete ? asOfMonth : asOfMonth - 1;
+  const firstMonth = Number(periodStart.slice(0, 4)) === year ? Number(periodStart.slice(5, 7)) : 1;
   const monthsIdx = [];
-  for (let m = 1; m <= lastFullMonth; m++) monthsIdx.push(m);
-  const monSum = (yr, mo) => sales.reduce((a, r) => a + (r.d.slice(0, 4) === String(yr) && Number(r.d.slice(5, 7)) === mo ? r.amt : 0), 0);
+  for (let m = firstMonth; m <= lastFullMonth; m++) monthsIdx.push(m);
+  // sum a given calendar month, restricted to the (cur or LY) period window
+  const monWin = (yr, mo, from, to) => sales.reduce((a, r) => a + (Number(r.d.slice(0, 4)) === yr && Number(r.d.slice(5, 7)) === mo && inR(r.d, from, to) ? r.amt : 0), 0);
   const monthly = {
     idx: monthsIdx,
-    cur: monthsIdx.map(m => monSum(year, m)),
-    prev: monthsIdx.map(m => monSum(prev, m)),
+    cur: monthsIdx.map(m => monWin(year, m, ytdFrom, ytdTo)),
+    prev: monthsIdx.map(m => monWin(prev, m, lyFrom, lyTo)),
     partialMonth: monthComplete ? null : asOfMonth  // 1-based index of excluded month, or null
   };
 
@@ -331,7 +407,7 @@ function computeModel(data) {
   const segPerf = [...segs.values()];
 
   return {
-    asOf, year, prev, yearStart,
+    asOf, year, prev, yearStart: periodStart,   // yearStart doubles as the period-start label
     sales: { ytd, ly, delta, deltaPct, activeCustomers, countries, monthly },
     markets: { topCountries, topSegments, topCountriesShare, topSegShare },
     book: {
@@ -1124,10 +1200,15 @@ function handleFile(file) {
       const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: false });
       setProgress(70, str.loadComputing); await yieldPaint();
       const data = cleanData(wb);
-      const model = computeModel(data);
-      MODEL = model; SOURCE = file.name;
+      // keep the cleaned data so the filter bar can re-derive the model live
+      DATA = data;
+      ASOF = data.sales.reduce((mx, r) => r.d > mx ? r.d : mx, '');
+      OPTIONS = filterOptions(data);
+      FILTERS = emptyFilters();
+      SOURCE = file.name;
+      applyFilters();                          // computes MODEL + renders
+      buildFilterBar();
       setProgress(100, str.loadRendering); await yieldPaint();
-      render();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       console.error(err);
@@ -1139,6 +1220,143 @@ function handleFile(file) {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+/* ------------------------------------------------------------------ *
+ * 6b. Filter bar (live upload only). The cleaned data (DATA) is kept in
+ * memory; every change re-derives the model from it so all numbers move
+ * together. Shared links / snapshots carry only the computed model, so
+ * the bar is hidden there (nothing to re-filter).
+ * ------------------------------------------------------------------ */
+const FILTER_DIMS = [ // [state key, i18n label key, options key]
+  ['rep', 'fltRep', 'rep'], ['clientCat', 'fltClientCat', 'clientCat'],
+  ['sub', 'fltSub', 'sub'], ['loc', 'fltLoc', 'loc'],
+  ['customer', 'fltCustomer', 'customer'], ['ctype', 'fltCType', 'ctype'],
+  ['custCat', 'fltCustCat', 'custCat'], ['country', 'fltCountry', 'country'],
+  ['seg', 'fltSeg', 'seg']
+];
+
+// count of active (non-empty) filter dimensions
+function activeFilterCount() {
+  if (!FILTERS) return 0;
+  let n = 0;
+  FILTER_DIMS.forEach(([k]) => { if (FILTERS[k] && FILTERS[k].length) n++; });
+  if (FILTERS.from || FILTERS.to) n++;
+  if (FILTERS.doc) n++;
+  return n;
+}
+
+// re-derive MODEL from DATA + FILTERS and paint the dashboard (not the bar)
+function applyFilters() {
+  if (!DATA) return;
+  const fd = filterData(DATA, FILTERS);
+  if (!fd.sales.length) { MODEL = null; renderFilterEmpty(); return; }
+  MODEL = computeModel(fd, { asOf: ASOF, from: FILTERS.from, to: FILTERS.to });
+  render();
+}
+
+// message shown in the dashboard area when a filter combination has no sales.
+// Does NOT go through render()/renderEmpty (which would show the uploader) —
+// the header, controls and filter bar stay put so the user can adjust.
+function renderFilterEmpty() {
+  const str = S();
+  $('uploader').hidden = true;
+  $('loading').hidden = true;
+  $('asof-box').hidden = true;
+  $('foot').hidden = true;
+  $('dashboard').hidden = false;
+  $('dashboard').innerHTML = `<div class="filter-empty"><div class="fe-icon">⃠</div><div>${esc(str.fltEmpty)}</div><button class="btn-file" id="fe-reset" type="button">${esc(str.fltReset)}</button></div>`;
+  const b = $('fe-reset'); if (b) b.addEventListener('click', resetFilters);
+}
+
+function resetFilters() {
+  if (!DATA) return;
+  FILTERS = emptyFilters();
+  buildFilterBar();
+  applyFilters();
+}
+
+// read the current DOM controls back into FILTERS (single source at change time)
+function collectFilters() {
+  const bar = $('filterbar');
+  FILTER_DIMS.forEach(([k]) => {
+    FILTERS[k] = Array.from(bar.querySelectorAll(`input[type=checkbox][data-dim="${k}"]:checked`)).map(c => c.value);
+  });
+  FILTERS.from = bar.querySelector('#f-from').value.trim();
+  FILTERS.to = bar.querySelector('#f-to').value.trim();
+  FILTERS.doc = bar.querySelector('#f-doc').value.trim();
+}
+
+// build (or rebuild) the whole bar from OPTIONS + FILTERS + current language.
+// Rebuilt on load and on language change; individual changes don't rebuild it.
+function buildFilterBar() {
+  const bar = $('filterbar');
+  if (!DATA || window.__MRO_SNAPSHOT) { bar.hidden = true; bar.innerHTML = ''; return; }
+  const str = S();
+  const dd = ([k, lblKey, optKey]) => {
+    const opts = OPTIONS[optKey] || [];
+    const sel = new Set(FILTERS[k] || []);
+    const n = sel.size;
+    const items = opts.map(v =>
+      `<label class="fdd-opt"><input type="checkbox" data-dim="${k}" value="${esc(v)}"${sel.has(v) ? ' checked' : ''}><span>${esc(v)}</span></label>`
+    ).join('');
+    return `<details class="fdd" data-key="${k}">
+      <summary><span class="fdd-lbl">${esc(str[lblKey])}</span><span class="fdd-cnt${n ? ' on' : ''}">${n ? n : str.fltAll}</span></summary>
+      <div class="fdd-menu">${items || `<div class="fdd-none">${esc(str.fltAll)}</div>`}</div>
+    </details>`;
+  };
+  const nActive = activeFilterCount();
+  bar.innerHTML = `
+    <div class="flt-head">
+      <button class="flt-toggle" id="f-toggle" type="button" aria-expanded="true">
+        <span class="flt-ico">⛃</span><span>${esc(str.fltTitle)}</span>
+        <span class="flt-active${nActive ? ' on' : ''}" id="f-active">${nActive ? fmt(str.fltActive, { n: nActive }) : str.fltNone}</span>
+      </button>
+      <button class="btn-file flt-reset${nActive ? '' : ' hidden'}" id="f-reset" type="button">${esc(str.fltReset)}</button>
+    </div>
+    <div class="flt-body" id="f-body">
+      <label class="flt-date"><span>${esc(str.fltFrom)}</span><input type="date" id="f-from" value="${esc(FILTERS.from || '')}"></label>
+      <label class="flt-date"><span>${esc(str.fltTo)}</span><input type="date" id="f-to" value="${esc(FILTERS.to || '')}"></label>
+      ${FILTER_DIMS.map(dd).join('')}
+      <label class="flt-doc"><span>${esc(str.fltDoc)}</span><input type="text" id="f-doc" value="${esc(FILTERS.doc || '')}" placeholder="${esc(str.fltDocPh)}"></label>
+    </div>`;
+  bar.hidden = false;
+}
+
+// update just the summary badges + active-count after a change (bar stays put)
+function updateFilterBadges() {
+  const bar = $('filterbar');
+  FILTER_DIMS.forEach(([k]) => {
+    const cnt = bar.querySelector(`details[data-key="${k}"] .fdd-cnt`);
+    const n = (FILTERS[k] || []).length;
+    if (cnt) { cnt.textContent = n ? String(n) : S().fltAll; cnt.classList.toggle('on', !!n); }
+  });
+  const nActive = activeFilterCount();
+  const act = $('f-active');
+  if (act) { act.textContent = nActive ? fmt(S().fltActive, { n: nActive }) : S().fltNone; act.classList.toggle('on', !!nActive); }
+  const rst = $('f-reset'); if (rst) rst.classList.toggle('hidden', !nActive);
+}
+
+// one-time delegated wiring on the (persistent) bar container
+function wireFilterBar() {
+  const bar = $('filterbar');
+  const onChange = () => { collectFilters(); applyFilters(); updateFilterBadges(); };
+  bar.addEventListener('change', e => { if (e.target.matches('input')) onChange(); });
+  // debounce the free-text document field so we don't recompute on every keystroke
+  let docT = null;
+  bar.addEventListener('input', e => {
+    if (e.target.id !== 'f-doc') return;
+    clearTimeout(docT); docT = setTimeout(onChange, 250);
+  });
+  bar.addEventListener('click', e => {
+    if (e.target.closest('#f-reset')) { resetFilters(); return; }
+    const tg = e.target.closest('#f-toggle');
+    if (tg) {
+      const body = $('f-body'); if (!body) return;
+      const collapsed = body.classList.toggle('collapsed');
+      tg.setAttribute('aria-expanded', String(!collapsed));
+    }
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -1162,11 +1380,13 @@ function init() {
   ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); if (ev === 'dragleave' && drop.contains(e.relatedTarget)) return; drop.classList.remove('drag'); }));
   drop.addEventListener('drop', e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handleFile(f); });
 
-  $('btn-reupload').addEventListener('click', () => { MODEL = null; SOURCE = ''; $('file-input').value = ''; if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); });
+  $('btn-reupload').addEventListener('click', () => { MODEL = null; SOURCE = ''; DATA = null; FILTERS = null; OPTIONS = null; buildFilterBar(); $('file-input').value = ''; if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); });
   $('btn-share').addEventListener('click', shareCurrent);
   $('btn-sample').addEventListener('click', downloadSample);
+  wireFilterBar();
 
-  document.querySelectorAll('#lang-seg .seg-btn').forEach(b => b.addEventListener('click', () => { LANG = b.dataset.lang; localStorage.setItem('mro.lang', LANG); render(); }));
+  // language change relabels the (persistent) filter bar without losing selections
+  document.querySelectorAll('#lang-seg .seg-btn').forEach(b => b.addEventListener('click', () => { LANG = b.dataset.lang; localStorage.setItem('mro.lang', LANG); render(); buildFilterBar(); }));
   document.querySelectorAll('#theme-seg .seg-btn').forEach(b => b.addEventListener('click', () => { THEME = b.dataset.themeBtn; localStorage.setItem('mro.theme', THEME); render(); }));
 
   window.addEventListener('resize', updateScrollShadows);

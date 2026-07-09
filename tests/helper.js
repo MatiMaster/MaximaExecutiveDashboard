@@ -53,7 +53,8 @@ function makeCtx(lang = 'es') {
     // capture lexical consts + function declarations from app.js's scope
     + `\n;globalThis.__app = {
          cleanData, computeModel, buildSampleWorkbook, compactModel, hydrateModel,
-         classifyProducts, toISO, lyISO, short, full, num, pct1, pct0, fmt,
+         classifyProducts, filterData, filterOptions, emptyFilters, clientCat,
+         toISO, lyISO, short, full, num, pct1, pct0, fmt,
          encodeShare, decodeShare, setLang: l => { LANG = l; }, getLang: () => LANG
        };`;
   vm.runInContext(src, ctx, { filename: 'app-bundle.js' });
@@ -76,6 +77,16 @@ function modelFromSheets(ctx, sheets) {
   return ctx.__app.computeModel(ctx.__app.cleanData(wb));
 }
 
+// clean the sheets, then apply filters F, then computeModel with a stable as-of
+// (the full-data max Sales date) so filtering never moves the period anchor.
+function filteredModelFromSheets(ctx, sheets, F) {
+  const wb = ctx.XLSX.read(sheetsToBytes(ctx, sheets), { type: 'array', cellDates: false });
+  const data = ctx.__app.cleanData(wb);
+  const asOf = data.sales.reduce((mx, r) => r.d > mx ? r.d : mx, '');
+  const fd = ctx.__app.filterData(data, F);
+  return ctx.__app.computeModel(fd, { asOf, from: F.from, to: F.to });
+}
+
 // Same but starting from an in-memory workbook object (e.g. the sample builder)
 function modelFromWorkbook(ctx, wb) {
   const out = ctx.XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
@@ -84,4 +95,4 @@ function modelFromWorkbook(ctx, wb) {
   return ctx.__app.computeModel(ctx.__app.cleanData(wb2));
 }
 
-module.exports = { makeCtx, sheetsToBytes, modelFromSheets, modelFromWorkbook };
+module.exports = { makeCtx, sheetsToBytes, modelFromSheets, modelFromWorkbook, filteredModelFromSheets };

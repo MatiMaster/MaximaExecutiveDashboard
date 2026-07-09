@@ -212,13 +212,6 @@ svg text{font-family:inherit}
 .tt{position:fixed;pointer-events:none;background:var(--ink);color:var(--plane);
   padding:7px 10px;border-radius:8px;font-size:12px;font-weight:600;opacity:0;
   transition:opacity .08s;z-index:30;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.25)}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);
-  background:var(--ink);color:var(--plane);padding:11px 18px;border-radius:11px;font-size:13px;
-  font-weight:700;z-index:50;box-shadow:0 10px 30px rgba(0,0,0,.3);opacity:0;pointer-events:none;
-  transition:opacity .2s ease,transform .2s ease}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-/* saved snapshots are a frozen view: hide controls that need the server/parser */
-.snapshot #btn-reupload,.snapshot #btn-share{display:none!important}
 
 @media (max-width:1000px){ .r-3{grid-template-columns:1fr} .r-4{grid-template-columns:1fr 1fr} }
 @media (max-width:820px){

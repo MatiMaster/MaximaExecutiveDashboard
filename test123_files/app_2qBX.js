@@ -807,11 +807,6 @@ function b64urlToBytes(s) {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
-function bytesToB64(bytes) {   // standard base64 (for data: URIs)
-  let bin = ''; const CH = 0x8000;
-  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
-  return btoa(bin);
-}
 async function gzipBytes(str) { const s = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip')); return new Uint8Array(await new Response(s).arrayBuffer()); }
 async function gunzipStr(bytes) { const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')); return new TextDecoder().decode(await new Response(s).arrayBuffer()); }
 async function encodeShare(str) {
@@ -911,62 +906,6 @@ async function loadShared(enc) {
     console.error('shared link decode failed', e);
     MODEL = null; render(); showError(S().errShared);
   }
-}
-
-// small transient toast (bottom-center)
-let _toastTimer;
-function showToast(msg) {
-  const t = $('toast'); if (!t) return;
-  t.textContent = msg; t.hidden = false;
-  requestAnimationFrame(() => t.classList.add('show'));
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => { t.classList.remove('show'); setTimeout(() => { t.hidden = true; }, 250); }, 1900);
-}
-
-/* ------------------------------------------------------------------ *
- * 6b. Save snapshot — Ctrl/Cmd+S downloads a self-contained .html that
- *     inlines the CSS/JS and embeds the computed model, so opening it
- *     re-renders the whole dashboard OFFLINE (no server, no re-upload).
- *     The XLSX parser is dropped (a snapshot never parses a file).
- * ------------------------------------------------------------------ */
-async function buildSnapshotHtml() {
-  const escJs = s => s.replace(/<\/script>/gi, '<\\/script>');
-  const logoSrc = document.querySelector('.brand-logo')?.getAttribute('src') || 'assets/MaximaRacingOilsLogo2.png';
-  const [css, i18nSrc, appSrc, indexHtml, favBuf, logoBuf] = await Promise.all([
-    fetch('assets/styles.css').then(r => r.text()),
-    fetch('assets/i18n.js').then(r => r.text()),
-    fetch('assets/app.js').then(r => r.text()),
-    fetch('index.html').then(r => r.text()),
-    fetch('assets/favicon.png').then(r => r.arrayBuffer()).catch(() => null),
-    fetch(logoSrc).then(r => r.arrayBuffer()).catch(() => null)
-  ]);
-  const enc = await encodeShare(JSON.stringify({ v: 2, source: SOURCE, model: compactModel(MODEL) }));
-  const snap = JSON.stringify({ d: enc, lang: LANG, theme: THEME, source: SOURCE }).replace(/</g, '\\u003c');
-  const dataUri = buf => 'data:image/png;base64,' + bytesToB64(new Uint8Array(buf));
-  // NOTE: function-form replacements — a plain string replacement would treat
-  // '$' in the embedded JS as a special pattern (e.g. $' = "rest of string")
-  // and corrupt/truncate the code.
-  let html = indexHtml
-    .replace(/<link[^>]+assets\/styles\.css[^>]*>/, () => `<style>\n${css}\n</style>`)
-    .replace(/<script[^>]+vendor\/xlsx\.full\.min\.js[^>]*><\/script>/, () => '')
-    .replace(/<script[^>]+assets\/i18n\.js[^>]*><\/script>/, () => `<script>${escJs(i18nSrc)}</script>`)
-    .replace(/<script[^>]+assets\/app\.js[^>]*><\/script>/, () => `<script>window.__MRO_SNAPSHOT=${snap};</script>\n<script>${escJs(appSrc)}</script>`);
-  if (favBuf) html = html.split('assets/favicon.png').join(dataUri(favBuf));
-  if (logoBuf) html = html.split(logoSrc).join(dataUri(logoBuf));
-  return html;
-}
-async function saveSnapshot() {
-  if (!MODEL || window.__MRO_SNAPSHOT) return;   // nothing to save on the upload page or inside a snapshot
-  showToast(S().savingSnapshot);
-  try {
-    const html = await buildSnapshotHtml();
-    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
-    const a = document.createElement('a');
-    a.href = url; a.download = `MRO_dashboard_${MODEL.asOf}.html`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    showToast(S().savedSnapshot);
-  } catch (e) { console.error('snapshot failed', e); showToast(S().savedError); }
 }
 
 /* ------------------------------------------------------------------ *
@@ -1085,12 +1024,6 @@ function handleFile(file) {
  * 7. Wiring
  * ------------------------------------------------------------------ */
 function init() {
-  const snapshot = window.__MRO_SNAPSHOT;        // present only inside a saved snapshot file
-  if (snapshot) {
-    if (snapshot.lang) LANG = snapshot.lang;
-    if (snapshot.theme) THEME = snapshot.theme;
-    document.documentElement.classList.add('snapshot');
-  }
   document.documentElement.setAttribute('data-theme', THEME);
   document.documentElement.setAttribute('lang', LANG);
 
@@ -1111,18 +1044,8 @@ function init() {
 
   window.addEventListener('resize', updateScrollShadows);
 
-  // Ctrl/Cmd+S saves the current numbers as a self-contained dashboard file
-  // (only once data is loaded, and not inside an already-saved snapshot).
-  window.addEventListener('keydown', e => {
-    if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S') && MODEL && !window.__MRO_SNAPSHOT) {
-      e.preventDefault(); saveSnapshot();
-    }
-  });
-
-  // snapshot file? render from the embedded model. shared link? decode from the
-  // URL hash. otherwise show the uploader.
-  if (snapshot) loadShared(snapshot.d);
-  else if (/^#d=/.test(location.hash)) loadShared(location.hash.slice(3));
+  // shared link? decode and render from the URL; otherwise show the uploader
+  if (/^#d=/.test(location.hash)) loadShared(location.hash.slice(3));
   else render();
 }
 document.addEventListener('DOMContentLoaded', init);
